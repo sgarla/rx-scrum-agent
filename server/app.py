@@ -27,7 +27,11 @@ CLIENT_DIST = Path(__file__).parent.parent / "client" / "dist"
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Initializing database...")
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        logger.error(f"DATABASE INIT FAILED — {type(e).__name__}: {e}", exc_info=True)
+        raise
 
     # Ensure agent work directory exists
     work_dir = Path(os.getenv("WORK_DIR", "./agent_work"))
