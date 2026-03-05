@@ -1,4 +1,4 @@
-import { Activity, ChevronDown, Users } from 'lucide-react'
+import { Activity, ChevronDown, Settings, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { fetchHealth } from '../../lib/api'
 
@@ -9,6 +9,7 @@ interface HeaderProps {
   onAssigneeChange: (a: string | null) => void
   sprints: string[]
   assignees: string[]
+  onOpenSettings?: () => void
 }
 
 const AVATARS: Record<string, string> = {
@@ -32,6 +33,7 @@ export function Header({
   onAssigneeChange,
   sprints,
   assignees,
+  onOpenSettings,
 }: HeaderProps) {
   const [wsUrl, setWsUrl] = useState<string | null>(null)
   const [connected, setConnected] = useState(false)
@@ -116,6 +118,17 @@ export function Header({
               : 'Not connected'}
           </span>
         </div>
+
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            className="p-1.5 rounded-md transition-all"
+            style={{ color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)' }}
+            title="Settings"
+          >
+            <Settings size={14} />
+          </button>
+        )}
       </div>
     </header>
   )

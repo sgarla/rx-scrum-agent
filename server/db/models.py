@@ -111,3 +111,16 @@ class Asset(Base):
             "full_path": self.full_path,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class Setting(Base):
+    """Key-value store for app settings (e.g. ServiceNow connection)."""
+
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+
+    def to_dict(self) -> dict:
+        return {"key": self.key, "value": self.value}

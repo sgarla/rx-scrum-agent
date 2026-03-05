@@ -31,10 +31,17 @@ class InvokeAgentRequest(BaseModel):
 
 @router.post("/conversations")
 async def create_conversation(body: CreateConversationRequest, db: Session = Depends(get_db)):
-    """Create a conversation for a JIRA story."""
-    story = get_story(body.story_key)
-    if not story:
-        raise HTTPException(status_code=404, detail=f"Story {body.story_key} not found")
+    """Create a conversation for a JIRA story or a ServiceNow incident."""
+    import re
+    is_incident = bool(re.match(r'^INC\d+$', str(body.story_key), re.IGNORECASE))
+
+    if is_incident:
+        # Incidents don't have a story entry — create a minimal placeholder
+        story = {"key": body.story_key, "type": "incident", "summary": f"Incident {body.story_key}"}
+    else:
+        story = get_story(body.story_key)
+        if not story:
+            raise HTTPException(status_code=404, detail=f"Story {body.story_key} not found")
 
     conv = Conversation(
         story_key=body.story_key,
@@ -189,6 +196,10 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
             _conv_row.session_id = final_session_id
             _conv_row.status = "idle"
             # Story status reverts to "todo" after agent completes — user must explicitly mark as Done
+            # Skip status update for ServiceNow incidents (they are managed externally)
+            import re
+            if not re.match(r'^INC\d+$', str(_story_key), re.IGNORECASE):
+                update_story_status(_story_key, "todo")
 
             assets = extract_assets(full_text)
             for asset_data in assets:

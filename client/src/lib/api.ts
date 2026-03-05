@@ -1,4 +1,4 @@
-import type { Asset, AssetSession, Conversation, JiraStory, StoredMessage, StoryFilters } from './types'
+import type { Asset, AssetSession, Conversation, JiraStory, ServiceNowIncident, ServiceNowSettings, StoredMessage, StoryFilters } from './types'
 
 const BASE = '/api'
 
@@ -108,6 +108,49 @@ export function groupAssetsBySessions(assets: Asset[]): AssetSession[] {
 
 export async function fetchAllAssets(): Promise<Record<string, Asset[]>> {
   return request<Record<string, Asset[]>>('/assets')
+}
+
+export async function reparseStoryAssets(story_key: string): Promise<{ assets: Asset[]; session_count: number; new_assets_found: number }> {
+  return request(`/stories/${story_key}/reparse-assets`, { method: 'POST' })
+}
+
+// Settings
+export async function fetchSettings(): Promise<ServiceNowSettings> {
+  return request<ServiceNowSettings>('/settings')
+}
+
+export async function updateSettings(settings: Record<string, string>): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  })
+}
+
+export async function testSnowConnection(
+  snow_instance: string,
+  snow_username: string,
+  snow_password: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  return request('/settings/test-connection', {
+    method: 'POST',
+    body: JSON.stringify({ snow_instance, snow_username, snow_password }),
+  })
+}
+
+// Incidents
+export async function fetchIncidents(
+  opts: { search?: string; limit?: number; offset?: number } = {}
+): Promise<{ incidents: ServiceNowIncident[]; total: number; configured: boolean; error: string | null }> {
+  const params = new URLSearchParams()
+  if (opts.search) params.set('search', opts.search)
+  if (opts.limit != null) params.set('limit', String(opts.limit))
+  if (opts.offset != null) params.set('offset', String(opts.offset))
+  const qs = params.toString()
+  return request(`/incidents${qs ? '?' + qs : ''}`)
+}
+
+export async function fetchIncident(number: string): Promise<ServiceNowIncident> {
+  return request<ServiceNowIncident>(`/incidents/${encodeURIComponent(number)}`)
 }
 
 // Health

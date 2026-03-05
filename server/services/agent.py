@@ -228,14 +228,22 @@ def _run_in_thread(story, messages, session_id, conversation_id, put_event, on_c
         loop.close()
 
 
+def _is_incident_key(story_key: str) -> bool:
+    """Returns True if story_key looks like a ServiceNow incident number (e.g. INC0010001)."""
+    import re
+    return bool(re.match(r'^INC\d+$', str(story_key), re.IGNORECASE))
+
+
 async def _run_async(story, messages, session_id, conversation_id, put_event, mode='agent'):
     from claude_agent_sdk import ClaudeAgentOptions, query
-    from .system_prompt import build_story_system_prompt, build_planning_system_prompt
+    from .system_prompt import build_story_system_prompt, build_planning_system_prompt, build_incident_system_prompt
 
     # Read credentials fresh at call time (not from stale module-level globals)
     host = os.getenv("DATABRICKS_HOST", "") or DATABRICKS_HOST
     token = os.getenv("DATABRICKS_TOKEN", "") or DATABRICKS_TOKEN
-    logger.info(f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, mode={mode}")
+    story_key = story.get("key", "") if isinstance(story, dict) else ""
+    is_incident = _is_incident_key(story_key)
+    logger.info(f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, mode={mode}, is_incident={is_incident}")
     try:
         from databricks_tools_core.auth import set_databricks_auth
         set_databricks_auth(host, token)
@@ -246,6 +254,11 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
         system_prompt = build_planning_system_prompt(story)
         allowed_tools = BUILTIN_TOOLS
         mcp_servers = {}
+    elif is_incident:
+        system_prompt = build_incident_system_prompt()
+        mcp_server, tool_names = _load_databricks_tools()
+        allowed_tools = BUILTIN_TOOLS + tool_names
+        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
     else:
         system_prompt = build_story_system_prompt(story)
         mcp_server, tool_names = _load_databricks_tools()

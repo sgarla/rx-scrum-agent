@@ -27,11 +27,107 @@ ASSET_ICONS = {
 VALID_ASSET_TYPES = set(ASSET_ICONS.keys())
 
 
+
+# First segments that indicate a non-UC path (Python packages, domain names, etc.)
+_NON_UC_CATALOG = {
+    'pyspark', 'spark', 'java', 'com', 'org', 'net', 'io', 'apache',
+    'cloud', 'aws', 'gcp', 'azure', 'sys', 'os', 're', 'json', 'csv',
+    'http', 'https', 'information_schema', 'pg', 'public',
+}
+
+# Segments that indicate a Python method chain or library path
+_NON_UC_SEGMENT = {
+    'write', 'read', 'mode', 'format', 'save', 'load', 'sql', 'types',
+    'functions', 'column', 'row', 'session', 'context', 'overwrite',
+    'append', 'error', 'ignore', 'option', 'options', 'schema', 'collect',
+    'show', 'count', 'filter', 'select', 'join', 'groupby', 'agg',
+}
+
+
+def _extract_assets_fallback(text: str) -> list[dict]:
+    """Fallback: extract UC paths and job names from human-readable markdown output."""
+    results = []
+    seen = set()
+
+    # Match UC table/volume/schema paths like rxcorp.synthetic.members
+    uc_pattern = re.compile(r'\b([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\b')
+    for m in uc_pattern.finditer(text):
+        full_path = m.group(0)
+        if full_path in seen:
+            continue
+        catalog, schema, name = m.group(1), m.group(2), m.group(3)
+
+        # Skip non-UC patterns: Python packages, domain names, method chains
+        if catalog in _NON_UC_CATALOG:
+            continue
+        if any(seg in _NON_UC_SEGMENT for seg in (catalog, schema, name)):
+            continue
+        # Skip if the segment before this match looks like a Python identifier (df.write.x)
+        prefix = text[max(0, m.start()-2):m.start()]
+        if prefix.endswith('_.') or (len(prefix) >= 1 and prefix[-1] == '_'):
+            continue
+
+        seen.add(full_path)
+        # Guess type from context around match
+        ctx = text[max(0, m.start()-60):m.end()+60].lower()
+        if 'volume' in ctx or 'vol ' in ctx:
+            asset_type = 'volume'
+        elif 'pipeline' in ctx or 'dlt' in ctx:
+            asset_type = 'pipeline'
+        elif 'schema' in ctx and 'table' not in ctx:
+            asset_type = 'schema'
+        else:
+            asset_type = 'table'
+        results.append({
+            "type": asset_type,
+            "name": name,
+            "url": None,
+            "description": full_path,
+            "catalog": catalog,
+            "schema_name": schema,
+            "full_path": full_path,
+            "icon": ASSET_ICONS.get(asset_type, "🔗"),
+        })
+
+    # Match markdown links that look like job/notebook links: [Job Name](https://...)
+    link_pattern = re.compile(r'\[([^\]]+)\]\((https?://[^\)]+)\)')
+    for m in link_pattern.finditer(text):
+        name, url = m.group(1).strip(), m.group(2).strip()
+        if name in seen or not name:
+            continue
+        seen.add(name)
+        url_lower = url.lower()
+        if 'job' in url_lower or 'job' in name.lower():
+            asset_type = 'job'
+        elif 'pipeline' in url_lower or 'pipeline' in name.lower():
+            asset_type = 'pipeline'
+        elif 'dashboard' in url_lower or 'dashboard' in name.lower():
+            asset_type = 'dashboard'
+        elif 'endpoint' in url_lower or 'serving' in url_lower:
+            asset_type = 'endpoint'
+        elif 'notebook' in url_lower:
+            asset_type = 'notebook'
+        else:
+            asset_type = 'job'
+        results.append({
+            "type": asset_type,
+            "name": name,
+            "url": url,
+            "description": None,
+            "catalog": None,
+            "schema_name": None,
+            "full_path": None,
+            "icon": ASSET_ICONS.get(asset_type, "🔗"),
+        })
+
+    return results
+
+
 def extract_assets(text: str) -> list[dict]:
     """Extract asset list from agent output containing an <assets_summary> block.
 
+    Falls back to parsing human-readable markdown if no XML block is present.
     Returns a list of asset dicts with keys: type, name, url, description.
-    Returns [] if no valid assets_summary found.
     """
     # Match <assets_summary>...</assets_summary>
     pattern = re.compile(
@@ -40,7 +136,8 @@ def extract_assets(text: str) -> list[dict]:
     )
     match = pattern.search(text)
     if not match:
-        return []
+        logger.info("No <assets_summary> block found — using markdown fallback parser")
+        return _extract_assets_fallback(text)
 
     raw_json = match.group(1).strip()
     try:

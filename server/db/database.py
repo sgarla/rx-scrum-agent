@@ -75,16 +75,38 @@ def _get_db_token() -> str:
             raise
 
 
+def _get_pg_user() -> str:
+    """Get PostgreSQL username: PGUSER from Apps runtime, or current user from SDK."""
+    user = os.getenv("PGUSER", "")
+    if user:
+        return user
+    try:
+        from databricks.sdk import WorkspaceClient
+        w = WorkspaceClient()
+        me = w.current_user.me()
+        return me.user_name or me.display_name or ""
+    except Exception as e:
+        logger.warning(f"Could not resolve PG username from SDK: {e}")
+        return ""
+
+
 def _create_pg_connection():
     """Factory: create a psycopg2 connection with a fresh OAuth token."""
     import psycopg2
     host = _get_lakebase_host()
     token = _get_db_token()
+    user = _get_pg_user()
+    if not user:
+        raise RuntimeError(
+            "Cannot determine PostgreSQL username. Set PGUSER env var or ensure "
+            "Databricks SDK can resolve the current user."
+        )
+    logger.debug(f"Connecting to Lakebase as user: {user}")
     return psycopg2.connect(
         host=host,
         port=LAKEBASE_PORT,
         dbname=LAKEBASE_DATABASE_NAME,
-        user="token",
+        user=user,
         password=token,
         sslmode="require",
         connect_timeout=15,

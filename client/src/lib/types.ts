@@ -130,6 +130,44 @@ export interface StoryFilters {
   sprint: string
 }
 
+// ServiceNow Incidents
+export interface ServiceNowIncident {
+  sys_id: string
+  number: string
+  short_description: string
+  description: string
+  state: string
+  state_code: string
+  priority: string
+  priority_code: string
+  urgency: string
+  category: string
+  subcategory: string
+  assigned_to: string
+  assignment_group: string
+  cmdb_ci: string
+  caller_id: string
+  opened_at: string
+  resolved_at: string
+  sys_updated_on: string
+  close_notes: string
+  work_notes: string
+  comments: string
+}
+
+export interface IncidentFilters {
+  status: 'all' | 'open' | 'resolved'
+  search: string
+}
+
+export interface ServiceNowSettings {
+  snow_instance: string
+  snow_username: string
+  snow_password_set: boolean
+  snow_filter: string
+  configured: boolean
+}
+
 // Genie
 export interface GenieMessage {
   id: string

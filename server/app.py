@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .db import init_db
-from .routers import stories_router, agent_router, assets_router, genie_router
+from .routers import stories_router, agent_router, assets_router, genie_router, settings_router, incidents_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -69,6 +69,8 @@ app.include_router(stories_router, prefix=API_PREFIX, tags=["stories"])
 app.include_router(agent_router, prefix=API_PREFIX, tags=["agent"])
 app.include_router(assets_router, prefix=API_PREFIX, tags=["assets"])
 app.include_router(genie_router, prefix=API_PREFIX, tags=["genie"])
+app.include_router(settings_router, prefix=API_PREFIX, tags=["settings"])
+app.include_router(incidents_router, prefix=API_PREFIX, tags=["incidents"])
 
 
 @app.get("/api/health")
