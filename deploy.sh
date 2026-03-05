@@ -7,17 +7,18 @@ APP_NAME="rxscrum-agent"
 WORKSPACE_PATH="/Workspace/Users/satish.garla@databricks.com/apps/rxscrum-agent"
 PROFILE="builder-demo"
 STAGE="/tmp/rxscrum-stage"
+ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Building frontend ==="
-cd "$(dirname "$0")/client" && npm run build
-cd "$(dirname "$0")"
+cd "$ROOT/client" && npm run build
+cd "$ROOT"
 
 echo "=== Staging clean files ==="
 rm -rf "$STAGE"
 mkdir -p "$STAGE/client"
-cp app.yaml requirements.txt "$STAGE/"
-cp -r server "$STAGE/"
-cp -r client/dist "$STAGE/client/"
+cp "$ROOT/app.yaml" "$ROOT/requirements.txt" "$STAGE/"
+cp -r "$ROOT/server" "$STAGE/"
+cp -r "$ROOT/client/dist" "$STAGE/client/"
 find "$STAGE" -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find "$STAGE" -name "*.pyc" -delete 2>/dev/null || true
 echo "Stage size: $(du -sh "$STAGE" | cut -f1)"
