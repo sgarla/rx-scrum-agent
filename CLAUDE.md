@@ -8,7 +8,7 @@ using a Claude Code agent with Databricks MCP tools.
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS (dark theme, CSS variables)
 - **Backend**: FastAPI (Python), served via Databricks Apps compute
 - **AI**: Anthropic Claude via claude-agent-sdk, streamed over SSE to the browser
-- **Storage**: SQLite (`scrum-demo.db`) for conversations + messages
+- **Storage**: Lakebase PostgreSQL (`scrum-demo-db` instance, `databricks_postgres` DB) — conversations, messages, assets; set `USE_SQLITE=1` for local dev without Databricks credentials
 - **Deployed to**: Databricks Apps — app name `rxscrum-agent`, profile `builder-demo`
 
 ## Directory Structure

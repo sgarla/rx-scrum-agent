@@ -150,23 +150,9 @@ def _migrate_asset_columns(bind):
 
 
 def init_db():
-    """Create all tables. Falls back to SQLite if Lakebase is unavailable."""
-    global engine, SessionLocal
+    """Create all tables. Raises if the database is unavailable."""
     from . import models  # noqa: F401 - ensure models are registered
-    try:
-        Base.metadata.create_all(bind=engine)
-        _migrate_asset_columns(engine)
-        logger.info("Database tables created/verified successfully")
-    except Exception as e:
-        logger.error(f"Database init failed (Lakebase): {e}")
-        if not USE_SQLITE:
-            logger.warning("Falling back to SQLite for this session")
-            sqlite_engine = create_engine(
-                f"sqlite:///{SQLITE_PATH}",
-                connect_args={"check_same_thread": False},
-            )
-            engine = sqlite_engine
-            SessionLocal.configure(bind=sqlite_engine)
-            Base.metadata.create_all(bind=sqlite_engine)
-            _migrate_asset_columns(sqlite_engine)
-            logger.info("SQLite fallback database initialized")
+    Base.metadata.create_all(bind=engine)
+    _migrate_asset_columns(engine)
+    mode = "SQLite" if USE_SQLITE else f"Lakebase PostgreSQL ({LAKEBASE_INSTANCE_NAME}/{LAKEBASE_DATABASE_NAME})"
+    logger.info(f"Database initialized: {mode}")
