@@ -1,0 +1,37 @@
+command:
+  - "uvicorn"
+  - "server.app:app"
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "$DATABRICKS_APP_PORT"
+
+env:
+  - name: ENV
+    value: "production"
+  - name: LLM_PROVIDER
+    value: "DATABRICKS"
+  - name: DATABRICKS_MODEL
+    value: "databricks-claude-sonnet-4-5"
+  - name: ENABLED_SKILLS
+    value: "databricks-asset-bundles,databricks-spark-declarative-pipelines,databricks-aibi-dashboards,databricks-model-serving,databricks-synthetic-data-generation,databricks-agent-bricks,databricks-jobs,databricks-unity-catalog"
+  - name: AUTO_GRANT_PERMISSIONS_TO
+    value: "account users"
+  - name: MLFLOW_TRACKING_URI
+    value: "databricks"
+  - name: DEFAULT_CATALOG
+    value: "rxcorp"
+  - name: DEFAULT_SCHEMA
+    value: "claims"
+  - name: LAKEBASE_INSTANCE_NAME
+    value: "scrum-demo-db"
+  - name: LAKEBASE_DATABASE_NAME
+    value: "databricks_postgres"
+  - name: LAKEBASE_HOST
+    value: "instance-121c21b2-bef4-4ccf-95a5-c44264dca65b.database.cloud.databricks.com"
+  - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
+    value: "3600000"
+  - name: GENIE_SPACE_ID
+    value: ""
+  - name: GENIE_WAREHOUSE_ID
+    value: ""

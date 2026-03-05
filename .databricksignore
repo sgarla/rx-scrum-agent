@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+node_modules/
+client/node_modules/
+*.egg-info/
+.DS_Store
+agent_work/

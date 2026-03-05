@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Database (contains live data — never commit)
+*.db
+
+# Frontend build output
+client/dist/
+client/node_modules/
+node_modules/
+
+# Databricks CLI
+.databricks/
+
+# Agent working directory
+agent_work/
+
+# macOS
+.DS_Store
+
+# Secrets / local overrides
+.env
+app.yaml.local
