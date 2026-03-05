@@ -65,11 +65,12 @@ export interface InvokeAgentResponse {
 export async function invokeAgent(
   conversation_id: string,
   _story_key: string,
-  message: string
+  message: string,
+  mode: 'plan' | 'agent' = 'agent',
 ): Promise<InvokeAgentResponse> {
   return request<InvokeAgentResponse>('/invoke_agent', {
     method: 'POST',
-    body: JSON.stringify({ conversation_id, message }),
+    body: JSON.stringify({ conversation_id, message, mode }),
   })
 }
 

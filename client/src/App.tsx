@@ -47,7 +47,7 @@ export default function App() {
 
   const handleStartBuild = async () => {
     if (!activeStoryKey) return
-    await startBuild(activeStoryKey)
+    await startBuild(activeStoryKey, undefined, 'agent')
     setTimeout(reloadStories, 1000)
   }
 
@@ -128,7 +128,7 @@ export default function App() {
               conversationLoading={conversationLoading}
               error={error}
               onStartBuild={handleStartBuild}
-              onSendMessage={sendMessage}
+              onSendMessage={(text, mode) => sendMessage(text, mode)}
               onStop={stop}
             />
             <AssetsPanel

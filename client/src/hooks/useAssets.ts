@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchStoryAssets, groupAssetsBySessions } from '../lib/api'
 import type { Asset, AssetSession } from '../lib/types'
 
@@ -10,6 +10,7 @@ export function useAssets(
   const [sessions, setSessions] = useState<AssetSession[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
   const [loading, setLoading] = useState(false)
+  const prevBuildingRef = useRef(false)
 
   const load = useCallback(async () => {
     if (!storyKey) return
@@ -36,6 +37,14 @@ export function useAssets(
     if (!isBuilding) return
     const id = setInterval(load, 3000)
     return () => clearInterval(id)
+  }, [isBuilding, load])
+
+  // Final load when build completes — catches assets saved by on_complete callback
+  useEffect(() => {
+    if (prevBuildingRef.current && !isBuilding) {
+      load()
+    }
+    prevBuildingRef.current = isBuilding
   }, [isBuilding, load])
 
   return { assets, sessions, loading, reload: load }

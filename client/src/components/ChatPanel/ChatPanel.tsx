@@ -23,7 +23,7 @@ interface Props {
   conversationLoading?: boolean
   error: string | null
   onStartBuild: () => void
-  onSendMessage: (text: string) => void
+  onSendMessage: (text: string, mode: 'plan' | 'agent') => void
   onStop: () => void
 }
 
@@ -63,6 +63,13 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Snap to bottom when conversation finishes loading (messages were set while spinner was showing)
+  useEffect(() => {
+    if (!conversationLoading) {
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' })
+    }
+  }, [conversationLoading])
 
   if (!story) {
     return (
@@ -258,7 +265,7 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
 
       {/* Input */}
       <ChatInput
-        onSend={onSendMessage}
+        onSend={(text, mode) => onSendMessage(text, mode)}
         onStop={onStop}
         isBuilding={isBuilding}
         placeholder={!hasMessages ? 'Type a message or click "Build with AI" above...' : undefined}

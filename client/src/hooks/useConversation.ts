@@ -21,8 +21,8 @@ interface UseConversationReturn {
   isBuilding: boolean
   conversationLoading: boolean
   currentExecutionId: string | null
-  startBuild: (storyKey: string, message?: string) => Promise<void>
-  sendMessage: (text: string) => Promise<void>
+  startBuild: (storyKey: string, message?: string, mode?: 'plan' | 'agent') => Promise<void>
+  sendMessage: (text: string, mode?: 'plan' | 'agent') => Promise<void>
   stop: () => Promise<void>
   error: string | null
 }
@@ -224,7 +224,7 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     return conv
   }, [conversation])
 
-  const startBuild = useCallback(async (sk: string, message?: string) => {
+  const startBuild = useCallback(async (sk: string, message?: string, mode: 'plan' | 'agent' = 'agent') => {
     if (!sk) return
     setError(null)
     setIsBuilding(true)
@@ -240,7 +240,7 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
         timestamp: new Date(),
       })
 
-      const { execution_id } = await invokeAgent(conv.id, sk, userMsg)
+      const { execution_id } = await invokeAgent(conv.id, sk, userMsg, mode)
       setCurrentExecutionId(execution_id)
       executionRef.current = execution_id
       streamExecution(execution_id)
@@ -250,7 +250,7 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     }
   }, [ensureConversation, addMessage, streamExecution])
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, mode: 'plan' | 'agent' = 'agent') => {
     if (!storyKey || !text.trim()) return
     setError(null)
     setIsBuilding(true)
@@ -265,7 +265,7 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
         timestamp: new Date(),
       })
 
-      const { execution_id } = await invokeAgent(conv.id, storyKey, text)
+      const { execution_id } = await invokeAgent(conv.id, storyKey, text, mode)
       setCurrentExecutionId(execution_id)
       executionRef.current = execution_id
       streamExecution(execution_id)

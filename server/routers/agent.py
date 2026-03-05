@@ -26,6 +26,7 @@ class CreateConversationRequest(BaseModel):
 class InvokeAgentRequest(BaseModel):
     conversation_id: str
     message: str
+    mode: str = 'agent'  # 'plan' | 'agent'
 
 
 @router.post("/conversations")
@@ -229,6 +230,7 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
         conversation_id=conv.id,
         put_event=exec_state.put_event,
         on_complete=_save_on_complete,
+        mode=body.mode,
     )
     stream_manager.set_execution_thread(execution_id, thread)
 

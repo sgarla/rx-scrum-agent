@@ -186,6 +186,7 @@ def start_agent_build(
     conversation_id: str,
     put_event: Callable[[Any], None],
     on_complete: Callable[[], None] | None = None,
+    mode: str = 'agent',
 ) -> threading.Thread:
     """Start the agent in a background thread.
 
@@ -198,7 +199,7 @@ def start_agent_build(
     thread = threading.Thread(
         target=lambda: ctx.run(
             _run_in_thread,
-            story, messages, session_id, conversation_id, put_event, on_complete
+            story, messages, session_id, conversation_id, put_event, on_complete, mode
         ),
         daemon=True,
         name=f"agent-{conversation_id[:8]}",
@@ -207,12 +208,12 @@ def start_agent_build(
     return thread
 
 
-def _run_in_thread(story, messages, session_id, conversation_id, put_event, on_complete=None):
+def _run_in_thread(story, messages, session_id, conversation_id, put_event, on_complete=None, mode='agent'):
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(
-            _run_async(story, messages, session_id, conversation_id, put_event)
+            _run_async(story, messages, session_id, conversation_id, put_event, mode)
         )
         # Save to DB before sending the done sentinel so history is ready on next load
         if on_complete:
@@ -227,25 +228,29 @@ def _run_in_thread(story, messages, session_id, conversation_id, put_event, on_c
         loop.close()
 
 
-async def _run_async(story, messages, session_id, conversation_id, put_event):
+async def _run_async(story, messages, session_id, conversation_id, put_event, mode='agent'):
     from claude_agent_sdk import ClaudeAgentOptions, query
-    from .system_prompt import build_story_system_prompt
+    from .system_prompt import build_story_system_prompt, build_planning_system_prompt
 
     # Read credentials fresh at call time (not from stale module-level globals)
     host = os.getenv("DATABRICKS_HOST", "") or DATABRICKS_HOST
     token = os.getenv("DATABRICKS_TOKEN", "") or DATABRICKS_TOKEN
-    logger.info(f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}")
+    logger.info(f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, mode={mode}")
     try:
         from databricks_tools_core.auth import set_databricks_auth
         set_databricks_auth(host, token)
     except ImportError:
         pass
 
-    system_prompt = build_story_system_prompt(story)
-    mcp_server, tool_names = _load_databricks_tools()
-
-    allowed_tools = BUILTIN_TOOLS + tool_names
-    mcp_servers = {"databricks": mcp_server} if mcp_server else {}
+    if mode == 'plan':
+        system_prompt = build_planning_system_prompt(story)
+        allowed_tools = BUILTIN_TOOLS
+        mcp_servers = {}
+    else:
+        system_prompt = build_story_system_prompt(story)
+        mcp_server, tool_names = _load_databricks_tools()
+        allowed_tools = BUILTIN_TOOLS + tool_names
+        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
 
     work_dir = get_agent_work_dir(conversation_id)
     claude_env = build_claude_env(host, token)
