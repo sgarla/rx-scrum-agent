@@ -9,7 +9,7 @@ import { StoryPanel } from './components/StoryPanel/StoryPanel'
 import { useAssets } from './hooks/useAssets'
 import { useConversation } from './hooks/useConversation'
 import { useStories } from './hooks/useStories'
-import { fetchHealth } from './lib/api'
+import { fetchHealth, updateStoryStatus } from './lib/api'
 import type { JiraStory } from './lib/types'
 
 type AppTab = 'board' | 'genie'
@@ -51,6 +51,18 @@ export default function App() {
     setTimeout(reloadStories, 1000)
   }
 
+  const handleStatusToggle = async (key: string) => {
+    const story = stories.find(s => s.key === key)
+    if (!story || story.status === 'building') return
+    const next = story.status === 'done' ? 'todo' : 'done'
+    try {
+      await updateStoryStatus(key, next)
+      reloadStories()
+    } catch (err) {
+      toast.error('Failed to update status')
+    }
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       <Toaster
@@ -90,7 +102,7 @@ export default function App() {
           }}
         >
           <LayoutDashboard size={13} />
-          Board
+          Story Board
         </button>
         <button
           onClick={() => setActiveTab('genie')}
@@ -117,6 +129,7 @@ export default function App() {
           onFilterChange={updateFilter}
           activeStoryKey={activeStoryKey}
           onStorySelect={handleStorySelect}
+          onStatusToggle={handleStatusToggle}
         />
 
         {activeTab === 'board' ? (

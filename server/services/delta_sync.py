@@ -1,6 +1,6 @@
 """Sync Lakebase (PostgreSQL) scrum-demo data to UC Delta tables for Genie.
 
-Creates/refreshes three Delta tables in `healthcare_demo.scrum_demo`:
+Creates/refreshes three Delta tables in `rxcorp.rxscrum_agent`:
   - stories       -> one row per JIRA story (from static config)
   - conversations -> one row per conversation session
   - assets        -> one row per Databricks asset created, with full UC path info
@@ -15,8 +15,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
-CATALOG = os.getenv("DEFAULT_CATALOG", "healthcare_demo")
-SCHEMA = "scrum_demo"
+CATALOG = os.getenv("DEFAULT_CATALOG", "rxcorp")
+SCHEMA = "rxscrum_agent"
 HOST = os.getenv("DATABRICKS_HOST", "").rstrip("/")
 TOKEN = os.getenv("DATABRICKS_TOKEN", "")
 WAREHOUSE_ID = os.getenv("GENIE_WAREHOUSE_ID", "")

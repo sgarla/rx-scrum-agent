@@ -3,9 +3,10 @@ import { CheckCircle, Circle, Loader2 } from 'lucide-react'
 interface Props {
   status: 'todo' | 'building' | 'done'
   size?: 'sm' | 'md'
+  onClick?: () => void
 }
 
-export function StatusBadge({ status, size = 'sm' }: Props) {
+export function StatusBadge({ status, size = 'sm', onClick }: Props) {
   const configs = {
     todo: {
       label: 'Todo',
@@ -31,11 +32,18 @@ export function StatusBadge({ status, size = 'sm' }: Props) {
   const cfg = configs[status]
   const Icon = cfg.icon
   const iconSize = size === 'sm' ? 11 : 13
+  const isClickable = onClick && status !== 'building'
 
   return (
     <span
       className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
-      style={{ background: cfg.bg, color: cfg.color }}
+      style={{
+        background: cfg.bg,
+        color: cfg.color,
+        cursor: isClickable ? 'pointer' : 'default',
+      }}
+      title={isClickable ? (status === 'done' ? 'Mark as Todo' : 'Mark as Done') : undefined}
+      onClick={isClickable ? (e) => { e.stopPropagation(); onClick!() } : undefined}
     >
       <Icon
         size={iconSize}

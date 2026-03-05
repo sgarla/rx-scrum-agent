@@ -118,9 +118,10 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
     )
     db.add(user_msg)
 
-    # Update conversation status
+    # Update conversation status (only show "building" in agent mode — plan mode is conversational)
     conv.status = "building"
-    update_story_status(conv.story_key, "building")
+    if body.mode == 'agent':
+        update_story_status(conv.story_key, "building")
     db.commit()
 
     # Create execution in stream manager
@@ -186,8 +187,8 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
                         final_session_id = event.session_id
 
             _conv_row.session_id = final_session_id
-            _conv_row.status = "done"
-            update_story_status(_story_key, "done")
+            _conv_row.status = "idle"
+            # Story status reverts to "todo" after agent completes — user must explicitly mark as Done
 
             assets = extract_assets(full_text)
             for asset_data in assets:

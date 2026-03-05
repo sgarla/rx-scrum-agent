@@ -30,6 +30,16 @@ export async function fetchStory(key: string): Promise<JiraStory> {
   return request<JiraStory>(`/stories/${key}`)
 }
 
+export async function updateStoryStatus(
+  key: string,
+  status: 'todo' | 'building' | 'done',
+): Promise<void> {
+  await request(`/stories/${key}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
 // Conversations
 export async function createConversation(story_key: string): Promise<Conversation> {
   return request<Conversation>('/conversations', {

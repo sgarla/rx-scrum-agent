@@ -6,6 +6,7 @@ interface Props {
   story: JiraStory
   isActive: boolean
   onClick: () => void
+  onStatusToggle?: () => void
 }
 
 const TYPE_CONFIG: Record<string, { icon: React.ElementType; color: string; label: string }> = {
@@ -32,7 +33,7 @@ const AVATAR_COLORS: Record<string, string> = {
   'Marcus R.': '#14B8A6',
 }
 
-export function StoryCard({ story, isActive, onClick }: Props) {
+export function StoryCard({ story, isActive, onClick, onStatusToggle }: Props) {
   const typeCfg = TYPE_CONFIG[story.type] ?? TYPE_CONFIG.generic
   const priCfg = PRIORITY_CONFIG[story.priority] ?? PRIORITY_CONFIG.Medium
   const PriorityIcon = priCfg.icon
@@ -70,7 +71,7 @@ export function StoryCard({ story, isActive, onClick }: Props) {
           </span>
         </div>
 
-        <StatusBadge status={story.status} />
+        <StatusBadge status={story.status} onClick={onStatusToggle} />
       </div>
 
       {/* Title */}

@@ -10,6 +10,7 @@ interface Props {
   onFilterChange: (f: Partial<StoryFilters>) => void
   activeStoryKey: string | null
   onStorySelect: (key: string) => void
+  onStatusToggle?: (key: string) => void
 }
 
 const STATUS_TABS: Array<{ key: StoryFilters['status']; label: string }> = [
@@ -19,7 +20,7 @@ const STATUS_TABS: Array<{ key: StoryFilters['status']; label: string }> = [
   { key: 'done', label: 'Done' },
 ]
 
-export function StoryPanel({ stories, loading, filters, onFilterChange, activeStoryKey, onStorySelect }: Props) {
+export function StoryPanel({ stories, loading, filters, onFilterChange, activeStoryKey, onStorySelect, onStatusToggle }: Props) {
   const [searchFocused, setSearchFocused] = useState(false)
 
   const buildingCount = stories.filter(s => s.status === 'building').length
@@ -105,6 +106,7 @@ export function StoryPanel({ stories, loading, filters, onFilterChange, activeSt
                 story={story}
                 isActive={story.key === activeStoryKey}
                 onClick={() => onStorySelect(story.key)}
+                onStatusToggle={onStatusToggle ? () => onStatusToggle(story.key) : undefined}
               />
             ))}
           </div>
