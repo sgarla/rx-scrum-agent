@@ -151,8 +151,22 @@ def _migrate_asset_columns(bind):
 
 def init_db():
     """Create all tables. Raises if the database is unavailable."""
+    import sqlalchemy
     from . import models  # noqa: F401 - ensure models are registered
     Base.metadata.create_all(bind=engine)
     _migrate_asset_columns(engine)
+    # Grant read access to all authenticated users so the SQL editor and foreign catalog can query tables
+    if not USE_SQLITE:
+        try:
+            with engine.connect() as conn:
+                conn.execute(sqlalchemy.text("GRANT USAGE ON SCHEMA public TO PUBLIC"))
+                conn.execute(sqlalchemy.text("GRANT SELECT ON ALL TABLES IN SCHEMA public TO PUBLIC"))
+                conn.execute(sqlalchemy.text(
+                    "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO PUBLIC"
+                ))
+                conn.commit()
+            logger.info("Granted public SELECT on all tables in schema public")
+        except Exception as e:
+            logger.warning(f"Could not grant table privileges (non-fatal): {e}")
     mode = "SQLite" if USE_SQLITE else f"Lakebase PostgreSQL ({LAKEBASE_INSTANCE_NAME}/{LAKEBASE_DATABASE_NAME})"
     logger.info(f"Database initialized: {mode}")
