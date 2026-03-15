@@ -183,6 +183,54 @@ else
 fi
 echo ""
 
+# ─── Step 5b: Provision Lakebase PostgreSQL role for App SP ──────────────────
+echo ">>> Step 5b: Provisioning Lakebase role for App SP..."
+SP_UUID=$($DB apps get "$APP_NAME" --output json \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('service_principal_client_id',''))")
+SP_NUMERIC_ID=$($DB apps get "$APP_NAME" --output json \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('service_principal_id',''))")
+
+if [[ -z "$SP_UUID" || -z "$SP_NUMERIC_ID" ]]; then
+  echo "    ⚠️  Could not resolve SP info from apps get — provision Lakebase role manually (see README)"
+else
+  echo "    SP UUID:       $SP_UUID"
+  echo "    SP Numeric ID: $SP_NUMERIC_ID"
+
+  # Find psql
+  PSQL_BIN=""
+  if command -v psql &>/dev/null; then
+    PSQL_BIN="$(command -v psql)"
+  elif [[ -f "/opt/homebrew/opt/libpq/bin/psql" ]]; then
+    PSQL_BIN="/opt/homebrew/opt/libpq/bin/psql"
+  fi
+
+  if [[ -z "$PSQL_BIN" ]]; then
+    echo ""
+    echo "    ⚠️  psql not found. Install with: brew install libpq"
+    echo "    Then run manually:"
+    echo "      PATH=\"/opt/homebrew/opt/libpq/bin:\$PATH\" \\"
+    echo "      databricks --profile $PROFILE psql $LAKEBASE_INSTANCE -- -c \\"
+    echo "      \"CREATE ROLE \\\"$SP_UUID\\\" WITH LOGIN;"
+    echo "       SECURITY LABEL FOR databricks_auth ON ROLE \\\"$SP_UUID\\\" IS 'id=$SP_NUMERIC_ID,type=SERVICE_PRINCIPAL';"
+    echo "       GRANT CONNECT ON DATABASE databricks_postgres TO \\\"$SP_UUID\\\";"
+    echo "       GRANT USAGE, CREATE ON SCHEMA public TO \\\"$SP_UUID\\\";"
+    echo "       GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \\\"$SP_UUID\\\";"
+    echo "       ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO \\\"$SP_UUID\\\";\""
+    echo ""
+  else
+    PATH="$(dirname "$PSQL_BIN"):$PATH" $DB psql "$LAKEBASE_INSTANCE" -- -c "
+CREATE ROLE \"$SP_UUID\" WITH LOGIN;
+SECURITY LABEL FOR databricks_auth ON ROLE \"$SP_UUID\" IS 'id=$SP_NUMERIC_ID,type=SERVICE_PRINCIPAL';
+GRANT CONNECT ON DATABASE databricks_postgres TO \"$SP_UUID\";
+GRANT USAGE, CREATE ON SCHEMA public TO \"$SP_UUID\";
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"$SP_UUID\";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO \"$SP_UUID\";
+" 2>&1 | grep -v "Databricks CLI\|Your current\|Because both\|If you want\|Executing CLI\|^-"
+    echo "    ✓ Lakebase role provisioned"
+  fi
+fi
+echo ""
+
 # ─── Step 6: Grant Unity Catalog permissions to App SP ───────────────────────
 echo ">>> Step 6: Granting Unity Catalog permissions..."
 APP_SP=$($DB apps get "$APP_NAME" --output json \
