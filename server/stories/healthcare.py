@@ -4,6 +4,11 @@ These stories cover the full Databricks SDLC for an Rx claims / insurance platfo
 Each story maps to a specific Databricks skill and produces real workspace assets.
 """
 
+import json as _json
+import os as _os
+
+_CATALOG = _os.getenv("DEFAULT_CATALOG", "rxcorp")
+
 STORIES = [
     {
         "key": "CLAIMS-101",
@@ -190,6 +195,13 @@ STORIES = [
 
 # Index by key for O(1) lookup
 STORIES_BY_KEY = {s["key"]: s for s in STORIES}
+
+# Apply the configured catalog — replace the default "rxcorp" placeholder with the
+# actual catalog name from DEFAULT_CATALOG env var (set in app.yaml or .env).
+if _CATALOG != "rxcorp":
+    _patched = _json.loads(_json.dumps(STORIES).replace("rxcorp", _CATALOG))
+    STORIES[:] = _patched
+    STORIES_BY_KEY.update({s["key"]: s for s in STORIES})
 
 
 def get_all_stories(

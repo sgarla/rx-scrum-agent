@@ -8,7 +8,7 @@ import os
 
 WORKSPACE_URL = os.getenv("DATABRICKS_HOST", "").rstrip("/")
 AUTO_GRANT = os.getenv("AUTO_GRANT_PERMISSIONS_TO", "account users")
-DEFAULT_CATALOG = os.getenv("DEFAULT_CATALOG", "healthcare_demo")
+DEFAULT_CATALOG = os.getenv("DEFAULT_CATALOG", "rxcorp")
 DEFAULT_SCHEMA = os.getenv("DEFAULT_SCHEMA", "claims")
 
 # Per-story-type SDLC workflows
@@ -119,7 +119,7 @@ Follow these steps in order. Do NOT stop to ask questions.
 """,
 }
 
-_ASSET_SUMMARY_INSTRUCTIONS = """
+_ASSET_SUMMARY_INSTRUCTIONS_TEMPLATE = """
 ## FINAL STEP — Asset Summary (MANDATORY, DO NOT SKIP)
 
 After completing all work, you MUST write a brief human-readable completion message
@@ -152,6 +152,8 @@ Rules:
 - full_path format: <catalog>.<schema>.<name>
 - DO NOT omit this block. It is parsed by the UI to display your work in the Assets panel.
 """
+
+_ASSET_SUMMARY_INSTRUCTIONS = _ASSET_SUMMARY_INSTRUCTIONS_TEMPLATE.replace("rxcorp", DEFAULT_CATALOG)
 
 
 def build_story_system_prompt(story: dict) -> str:

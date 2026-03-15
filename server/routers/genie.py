@@ -132,7 +132,8 @@ async def genie_sync():
     try:
         from ..services.delta_sync import sync_to_delta
         sync_to_delta()
-        return {"status": "ok", "message": f"Synced to healthcare_demo.scrum_demo"}
+        from ..services.delta_sync import CATALOG, SCHEMA
+        return {"status": "ok", "message": f"Synced to {CATALOG}.{SCHEMA}"}
     except Exception as e:
         logger.error(f"Sync error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
