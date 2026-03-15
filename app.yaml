@@ -27,11 +27,14 @@ env:
     value: "scrum-demo-db"
   - name: LAKEBASE_DATABASE_NAME
     value: "databricks_postgres"
-  - name: LAKEBASE_HOST
-    value: "instance-121c21b2-bef4-4ccf-95a5-c44264dca65b.database.cloud.databricks.com"
   - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
     value: "3600000"
   - name: GENIE_SPACE_ID
     value: ""
   - name: GENIE_WAREHOUSE_ID
     value: ""
+
+resources:
+  - name: lakebase
+    database:
+      instance: scrum-demo-db
