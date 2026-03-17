@@ -10,8 +10,12 @@ STAGE="/tmp/rxscrum-stage"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== Building frontend ==="
-cd "$ROOT/client" && npm run build
-cd "$ROOT"
+if [[ ! -d "$ROOT/client/dist" ]]; then
+  cd "$ROOT/client" && npm run build
+  cd "$ROOT"
+else
+  echo "client/dist already exists — skipping npm build"
+fi
 
 echo "=== Staging clean files ==="
 rm -rf "$STAGE"

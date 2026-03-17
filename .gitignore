@@ -8,8 +8,7 @@ __pycache__/
 # Database (contains live data — never commit)
 *.db
 
-# Frontend build output
-client/dist/
+# Frontend build output (dist is committed so customers don't need npm)
 client/node_modules/
 node_modules/
 
