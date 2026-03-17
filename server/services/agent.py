@@ -9,6 +9,7 @@ See: https://github.com/anthropics/claude-agent-sdk-python/issues/462
 import asyncio
 import logging
 import os
+import shutil
 import threading
 from contextvars import copy_context
 from pathlib import Path
@@ -25,6 +26,9 @@ WORK_DIR = os.getenv("WORK_DIR", "./agent_work")
 # Databricks auth from environment
 DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")
 DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN", "")
+
+# Skills directory — point to ai-dev-kit/databricks-skills
+SKILLS_DIR = os.getenv("SKILLS_DIR", "")
 
 # LLM config
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ANTHROPIC")
@@ -127,6 +131,24 @@ def get_agent_work_dir(conversation_id: str) -> Path:
     work_path = Path(WORK_DIR) / conversation_id
     work_path.mkdir(parents=True, exist_ok=True)
     return work_path
+
+
+def _copy_skills_to_work_dir(work_dir: Path) -> None:
+    """Copy skills from SKILLS_DIR into work_dir/.claude/skills/ so Claude Code finds them."""
+    if not SKILLS_DIR:
+        return
+    skills_src = Path(SKILLS_DIR)
+    if not skills_src.exists():
+        logger.warning(f"SKILLS_DIR not found: {skills_src}")
+        return
+    dest = work_dir / ".claude" / "skills"
+    dest.mkdir(parents=True, exist_ok=True)
+    for skill_dir in skills_src.iterdir():
+        if skill_dir.is_dir() and (skill_dir / "SKILL.md").exists():
+            skill_dest = dest / skill_dir.name
+            if not skill_dest.exists():
+                shutil.copytree(skill_dir, skill_dest)
+    logger.info(f"Copied skills from {skills_src} to {dest}")
 
 
 def get_fmapi_token() -> str:
@@ -266,6 +288,7 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
         mcp_servers = {"databricks": mcp_server} if mcp_server else {}
 
     work_dir = get_agent_work_dir(conversation_id)
+    _copy_skills_to_work_dir(work_dir)
     claude_env = build_claude_env(host, token)
 
     def stderr_cb(line: str):
