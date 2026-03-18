@@ -27,8 +27,9 @@ WORK_DIR = os.getenv("WORK_DIR", "./agent_work")
 DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")
 DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN", "")
 
-# Skills directory — point to ai-dev-kit/databricks-skills
-SKILLS_DIR = os.getenv("SKILLS_DIR", "")
+# Skills directory — defaults to skills/ bundled in this project
+_PROJECT_ROOT = Path(__file__).parent.parent
+SKILLS_DIR = os.getenv("SKILLS_DIR", str(_PROJECT_ROOT / "skills"))
 
 # LLM config
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ANTHROPIC")

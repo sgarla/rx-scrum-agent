@@ -16,9 +16,9 @@ _WORKFLOWS: dict[str, str] = {
     "data_pipeline": """
 ## SDLC Workflow for Data Pipeline Story
 
-Follow these steps in order. Do NOT stop to ask questions — make reasonable assumptions and document them.
+Follow these steps in order. Ask questions is something is not clear and before running anything.
 
-1. **Load skill**: Invoke the `databricks-spark-declarative-pipelines` skill immediately.
+1. **Load skills**: Check available skills and invoke all that are relevant. Start with `databricks-spark-declarative-pipelines` skill immediately.
 2. **Generate synthetic source data**: If source tables/files don't exist, create a synthetic dataset first using Python + Faker so you have data to work with.
 3. **Write DLT pipeline code** (Python or SQL notebooks) following the medallion pattern (Bronze / Silver / Gold).
 4. **Upload notebook files** to the workspace using `upload_file`.
@@ -34,7 +34,7 @@ Follow these steps in order. Do NOT stop to ask questions — make reasonable as
 
 Follow these steps in order. Do NOT stop to ask questions.
 
-1. **Load skill**: Invoke the `databricks-aibi-dashboards` skill immediately.
+1. **Load skills**: Check available skills and invoke all that are relevant. Start with `databricks-aibi-dashboards` skill immediately.
 2. **Inspect target tables**: Query each table with `execute_sql` to understand schema and sample data.
 3. **Test ALL dataset queries** via `execute_sql` before including them in the dashboard JSON.
 4. **Design and build** the AI/BI dashboard following the skill's JSON schema requirements exactly:
@@ -49,7 +49,7 @@ Follow these steps in order. Do NOT stop to ask questions.
 
 Follow these steps in order. Do NOT stop to ask questions.
 
-1. **Load skill**: Invoke the `databricks-model-serving` skill immediately.
+1. **Load skills**: Check available skills and invoke all that are relevant. Start with `databricks-model-serving` skill immediately.
 2. **Check or create feature table**: If the feature table doesn't exist, generate synthetic features using `execute_databricks_command`.
 3. **Write training script** as a Python notebook — use scikit-learn or XGBoost, log to MLflow.
 4. **Upload and run** the notebook on a Databricks cluster using `run_python_file_on_databricks`.
@@ -64,7 +64,7 @@ Follow these steps in order. Do NOT stop to ask questions.
 
 Follow these steps in order. Do NOT stop to ask questions.
 
-1. **Load skill**: Invoke the `databricks-synthetic-data-generation` skill immediately.
+1. **Load skills**: Check available skills and invoke all that are relevant. Start with `databricks-synthetic-data-generation` skill immediately.
 2. **Plan schema** based on story acceptance criteria — define column names, types, cardinalities.
 3. **Write a Python script** using Faker + Spark to generate the data with realistic distributions.
 4. **Run the script** on Databricks using `execute_databricks_command` (Python).
@@ -79,7 +79,7 @@ Follow these steps in order. Do NOT stop to ask questions.
 
 Follow these steps in order. Do NOT stop to ask questions.
 
-1. **Load skill**: Invoke the `databricks-agent-bricks` skill immediately.
+1. **Load skills**: Check available skills and invoke all that are relevant. Start with `databricks-agent-bricks` skill immediately.
 2. **Create source documents**: If source documents don't exist, generate synthetic formulary/policy PDFs or text using `execute_databricks_command`.
 3. **Upload documents** to a Unity Catalog Volume.
 4. **Create Vector Search endpoint** (if not exists) using `create_or_update_vs_endpoint`.
@@ -96,7 +96,7 @@ Follow these steps in order. Do NOT stop to ask questions.
 
 Follow these steps in order. Do NOT stop to ask questions.
 
-1. **Load skill**: Invoke the `databricks-jobs` skill immediately.
+1. **Load skills**: Check available skills and invoke all that are relevant. Start with `databricks-jobs` skill immediately.
 2. **Create any prerequisite notebooks/scripts** that the job needs.
 3. **Create the Databricks Job** using `manage_jobs` with all tasks specified.
 4. **Configure the schedule** (cron expression per AC).
@@ -110,7 +110,7 @@ Follow these steps in order. Do NOT stop to ask questions.
     "generic": """
 ## SDLC Workflow
 
-1. Load the most relevant Databricks skill for this story type.
+1. **Load skills**: Check available skills and invoke all that are relevant to this story.
 2. Analyze the acceptance criteria carefully.
 3. Build the required Databricks assets step by step.
 4. Verify each acceptance criterion is met.
