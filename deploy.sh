@@ -23,6 +23,7 @@ mkdir -p "$STAGE/client"
 cp "$ROOT/app.yaml" "$ROOT/requirements.txt" "$STAGE/"
 cp -r "$ROOT/server" "$STAGE/"
 cp -r "$ROOT/client/dist" "$STAGE/client/"
+[[ -d "$ROOT/skills" ]] && cp -r "$ROOT/skills" "$STAGE/"
 find "$STAGE" -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 find "$STAGE" -name "*.pyc" -delete 2>/dev/null || true
 echo "Stage size: $(du -sh "$STAGE" | cut -f1)"

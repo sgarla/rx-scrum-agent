@@ -27,6 +27,8 @@ env:
     value: "scrum-demo-db"
   - name: LAKEBASE_DATABASE_NAME
     value: "databricks_postgres"
+  - name: SKILLS_DIR
+    value: "./skills"
   - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT
     value: "3600000"
   - name: GENIE_SPACE_ID
