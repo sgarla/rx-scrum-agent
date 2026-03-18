@@ -11,6 +11,7 @@
 #   --app-name      Databricks app name        (default: rxscrum-agent)
 #   --lakebase      Lakebase instance name     (default: scrum-demo-db)
 #   --capacity      Lakebase capacity unit     (default: CU_1, options: CU_1 CU_2 CU_4 CU_8)
+#   --user-email    Your Databricks user email (e.g. user@company.com)
 #
 # Example:
 #   ./setup_scrum_demo.sh --profile customer-demo
@@ -26,6 +27,7 @@ APP_NAME="rxscrum-agent"
 LAKEBASE_INSTANCE="scrum-demo-db"
 CAPACITY="CU_1"
 CUSTOM_CATALOG=false
+USER_EMAIL=""
 
 # ─── Parse arguments ─────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
@@ -36,6 +38,7 @@ while [[ $# -gt 0 ]]; do
     --app-name)  APP_NAME="$2";          shift 2 ;;
     --lakebase)  LAKEBASE_INSTANCE="$2"; shift 2 ;;
     --capacity)  CAPACITY="$2";          shift 2 ;;
+    --user-email) USER_EMAIL="$2";       shift 2 ;;
     -h|--help)
       sed -n '2,15p' "$0" | sed 's/^# \?//'
       exit 0 ;;
@@ -66,8 +69,18 @@ echo "======================================================="
 echo ""
 
 # ─── Get current user email (for workspace path) ─────────────────────────────
-echo ">>> Getting workspace user..."
-USER_EMAIL=$($DB current-user me --output json | python3 -c "import sys,json; print(json.load(sys.stdin)['userName'])")
+if [[ -z "$USER_EMAIL" ]]; then
+  echo ">>> Getting workspace user..."
+  USER_EMAIL=$($DB auth describe --output json | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+print(d.get('username') or d.get('userName') or d.get('user') or '')
+")
+  if [[ -z "$USER_EMAIL" ]]; then
+    echo "Error: Could not detect user email. Pass it explicitly: --user-email you@company.com"
+    exit 1
+  fi
+fi
 WORKSPACE_PATH="/Workspace/Users/$USER_EMAIL/apps/$APP_NAME"
 echo "    User: $USER_EMAIL"
 echo "    Workspace path: $WORKSPACE_PATH"

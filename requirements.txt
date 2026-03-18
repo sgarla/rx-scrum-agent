@@ -1,6 +1,6 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
-sqlalchemy>=2.0.0
+sqlalchemy==2.0.36
 psycopg2-binary>=2.9.9
 claude-agent-sdk==0.1.19
 databricks-mcp-server>=0.4.4
