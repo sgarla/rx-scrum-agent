@@ -29,7 +29,7 @@ export function AssetsPanel({ story, sessions, loading, isBuilding, workspaceUrl
       <div className="panel-header justify-between">
         <div className="flex items-center gap-2">
           <Layers size={14} style={{ color: 'var(--color-text-muted)' }} />
-          <span className="text-sm font-semibold text-white">Databricks Assets</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Databricks Assets</span>
           {totalAssets > 0 && (
             <span
               className="text-xs px-1.5 py-0.5 rounded-full font-medium"

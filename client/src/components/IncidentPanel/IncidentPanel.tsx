@@ -49,7 +49,7 @@ export function IncidentPanel({
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <AlertTriangle size={14} style={{ color: 'var(--color-text-muted)' }} />
-            <span className="text-sm font-semibold text-white">Incidents</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Incidents</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             {criticalCount > 0 && (

@@ -33,7 +33,7 @@ export function StoryPanel({ stories, loading, filters, onFilterChange, activeSt
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
             <SlidersHorizontal size={14} style={{ color: 'var(--color-text-muted)' }} />
-            <span className="text-sm font-semibold text-white">Sprint Board</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Sprint Board</span>
           </div>
           <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
             {buildingCount > 0 && (

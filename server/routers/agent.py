@@ -142,6 +142,7 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
     # even if the server restarts immediately after.
     _conv_id = conv.id
     _story_key = conv.story_key
+    _mode = body.mode
 
     def _save_on_complete():
         """Sync DB save — called from agent thread before done sentinel."""
@@ -201,7 +202,7 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
             if not re.match(r'^INC\d+$', str(_story_key), re.IGNORECASE):
                 update_story_status(_story_key, "todo")
 
-            assets = extract_assets(full_text)
+            assets = [] if _mode == 'plan' else extract_assets(full_text)
             for asset_data in assets:
                 _db.add(Asset(
                     conversation_id=_conv_id,
