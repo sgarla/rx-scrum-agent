@@ -230,7 +230,7 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
               )
             })}
 
-            {isBuilding && messages.length === 0 && (
+            {isBuilding && (messages.length === 0 || messages[messages.length - 1]?.role === 'user') && (
               <div className="flex gap-3 mb-4 animate-fade-in">
                 <div
                   className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
@@ -238,10 +238,17 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
                 >
                   AI
                 </div>
-                <div className="flex items-center gap-2 pt-1">
-                  <div className="building-dot" />
-                  <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                    Starting agent build...
+                <div
+                  className="flex items-center gap-2 px-3 py-2 rounded-2xl rounded-tl-sm"
+                  style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+                >
+                  <span className="flex gap-1 items-center">
+                    <span className="thinking-dot" style={{ animationDelay: '0ms' }} />
+                    <span className="thinking-dot" style={{ animationDelay: '150ms' }} />
+                    <span className="thinking-dot" style={{ animationDelay: '300ms' }} />
+                  </span>
+                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    Agent is thinking...
                   </span>
                 </div>
               </div>
