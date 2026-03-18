@@ -7,7 +7,6 @@ import {
   ExternalLink,
   GitBranch,
   Loader2,
-  PlayCircle,
   Sparkles,
   Timer,
 } from 'lucide-react'
@@ -22,7 +21,6 @@ interface Props {
   isBuilding: boolean
   conversationLoading?: boolean
   error: string | null
-  onStartBuild: () => void
   onSendMessage: (text: string, mode: 'plan' | 'agent') => void
   onStop: () => void
 }
@@ -56,7 +54,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   Low: '#6B7280',
 }
 
-export function ChatPanel({ story, messages, isBuilding, conversationLoading, error, onStartBuild, onSendMessage, onStop }: Props) {
+export function ChatPanel({ story, messages, isBuilding, conversationLoading, error, onSendMessage, onStop }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const TypeIcon = story ? (TYPE_ICONS[story.type] ?? Database) : null
 
@@ -199,7 +197,7 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
             <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading conversation...</span>
           </div>
         ) : !hasMessages && !isBuilding ? (
-          <EmptyState story={story} TypeIcon={TypeIcon!} onBuild={onStartBuild} />
+          <EmptyState story={story} TypeIcon={TypeIcon!} />
         ) : (
           <>
             {messages.map((msg, index) => {
@@ -287,7 +285,7 @@ const STATUS_COLORS: Record<string, string> = {
   done: '#22C55E',
 }
 
-function EmptyState({ story, TypeIcon, onBuild }: { story: JiraStory; TypeIcon: React.ElementType; onBuild: () => void }) {
+function EmptyState({ story, TypeIcon }: { story: JiraStory; TypeIcon: React.ElementType }) {
   const initials = story.assignee.split(' ').map((n: string) => n[0]).join('')
 
   return (
@@ -367,24 +365,10 @@ function EmptyState({ story, TypeIcon, onBuild }: { story: JiraStory; TypeIcon: 
         </ul>
       </div>
 
-      {/* Build CTA */}
-      <div className="flex flex-col items-center gap-2 py-2">
-        <button
-          onClick={onBuild}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all"
-          style={{
-            background: 'var(--color-accent)',
-            color: 'white',
-            boxShadow: '0 4px 24px rgba(255,54,33,0.35)',
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 32px rgba(255,54,33,0.5)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 24px rgba(255,54,33,0.35)' }}
-        >
-          <PlayCircle size={18} />
-          Build with AI
-        </button>
-        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-          Or type a question below to ask the AI about this story
+      {/* Prompt to start in Plan mode */}
+      <div className="flex flex-col items-center gap-1 py-2">
+        <p className="text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
+          Start in <strong style={{ color: 'var(--color-text-secondary)' }}>Plan mode</strong> to discuss the approach, then switch to <strong style={{ color: 'var(--color-text-secondary)' }}>Agent mode</strong> to build.
         </p>
       </div>
     </div>

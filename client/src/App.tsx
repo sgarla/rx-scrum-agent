@@ -239,7 +239,6 @@ Please investigate this incident by:
               isBuilding={storyBuilding}
               conversationLoading={storyConvLoading}
               error={storyError}
-              onStartBuild={handleStartBuild}
               onSendMessage={(text, mode) => storySend(text, mode)}
               onStop={storyStop}
             />
