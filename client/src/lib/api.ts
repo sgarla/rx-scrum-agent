@@ -65,6 +65,13 @@ export async function fetchConversationFull(
   return request(`/conversations/${id}`)
 }
 
+export async function updateConversation(id: string, title: string): Promise<Conversation> {
+  return request<Conversation>(`/conversations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ title }),
+  })
+}
+
 // Agent
 export interface InvokeAgentResponse {
   execution_id: string

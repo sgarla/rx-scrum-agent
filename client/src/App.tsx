@@ -37,7 +37,7 @@ export default function App() {
 
   // Story board hooks
   const { stories, loading, filters, updateFilter, assignees, sprints, reload: reloadStories } = useStories()
-  const { messages: storyMessages, isBuilding: storyBuilding, conversationLoading: storyConvLoading, conversation: storyConv, startBuild, sendMessage: storySend, stop: storyStop, error: storyError } = useConversation(activeStoryKey)
+  const { messages: storyMessages, isBuilding: storyBuilding, conversationLoading: storyConvLoading, conversation: storyConv, conversations: storyConversations, startBuild, sendMessage: storySend, stop: storyStop, error: storyError, createNewConversation: storyNewConv, switchConversation: storySwitchConv, renameConversation: storyRenameConv } = useConversation(activeStoryKey)
   const { sessions, loading: assetsLoading, reload: reloadAssets } = useAssets(storyConv?.id ?? null, activeStoryKey, storyBuilding)
 
   // Incidents hooks
@@ -241,6 +241,11 @@ Please investigate this incident by:
               error={storyError}
               onSendMessage={(text, mode) => storySend(text, mode)}
               onStop={storyStop}
+              conversations={storyConversations}
+              activeConversationId={storyConv?.id ?? null}
+              onNewConversation={storyNewConv}
+              onSwitchConversation={storySwitchConv}
+              onRenameConversation={storyRenameConv}
             />
             <AssetsPanel
               story={activeStory}

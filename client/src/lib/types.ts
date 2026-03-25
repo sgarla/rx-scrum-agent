@@ -18,6 +18,7 @@ export interface Conversation {
   story_key: string
   status: 'idle' | 'building' | 'done'
   session_id: string | null
+  title: string | null
   created_at: string
   updated_at: string
   message_count: number

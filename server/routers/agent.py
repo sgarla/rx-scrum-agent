@@ -21,6 +21,11 @@ router = APIRouter()
 
 class CreateConversationRequest(BaseModel):
     story_key: str
+    title: Optional[str] = None
+
+
+class UpdateConversationRequest(BaseModel):
+    title: str
 
 
 class InvokeAgentRequest(BaseModel):
@@ -43,10 +48,16 @@ async def create_conversation(body: CreateConversationRequest, db: Session = Dep
         if not story:
             raise HTTPException(status_code=404, detail=f"Story {body.story_key} not found")
 
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    hour = int(now.strftime('%I'))
+    auto_title = f"Chat · {now.strftime('%b %d')}, {hour}:{now.strftime('%M %p')}"
+
     conv = Conversation(
         story_key=body.story_key,
         story_json=json.dumps(story),
         status="idle",
+        title=body.title or auto_title,
     )
     db.add(conv)
     db.commit()
@@ -77,6 +88,17 @@ async def get_conversation(conversation_id: str, db: Session = Depends(get_db)):
         **conv.to_dict(),
         "messages": [m.to_dict() for m in conv.messages],
     }
+
+
+@router.patch("/conversations/{conversation_id}")
+async def update_conversation(conversation_id: str, body: UpdateConversationRequest, db: Session = Depends(get_db)):
+    conv = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    conv.title = body.title
+    db.commit()
+    db.refresh(conv)
+    return conv.to_dict()
 
 
 @router.get("/conversations")

@@ -6,12 +6,16 @@ import {
   Database,
   ExternalLink,
   GitBranch,
+  History,
   Loader2,
+  Pencil,
+  Plus,
   Sparkles,
   Timer,
+  X,
 } from 'lucide-react'
-import { useEffect, useRef } from 'react'
-import type { ChatMessage, JiraStory } from '../../lib/types'
+import { useEffect, useRef, useState } from 'react'
+import type { ChatMessage, Conversation, JiraStory } from '../../lib/types'
 import { AgentMessage } from './AgentMessage'
 import { ChatInput } from './ChatInput'
 
@@ -23,6 +27,11 @@ interface Props {
   error: string | null
   onSendMessage: (text: string, mode: 'plan' | 'agent') => void
   onStop: () => void
+  conversations?: Conversation[]
+  activeConversationId?: string | null
+  onNewConversation?: () => void
+  onSwitchConversation?: (conv: Conversation) => void
+  onRenameConversation?: (id: string, title: string) => void
 }
 
 function formatDateSeparator(date: Date): string {
@@ -54,8 +63,12 @@ const PRIORITY_COLORS: Record<string, string> = {
   Low: '#6B7280',
 }
 
-export function ChatPanel({ story, messages, isBuilding, conversationLoading, error, onSendMessage, onStop }: Props) {
+export function ChatPanel({
+  story, messages, isBuilding, conversationLoading, error, onSendMessage, onStop,
+  conversations = [], activeConversationId, onNewConversation, onSwitchConversation, onRenameConversation,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [showHistory, setShowHistory] = useState(false)
   const TypeIcon = story ? (TYPE_ICONS[story.type] ?? Database) : null
 
   useEffect(() => {
@@ -153,7 +166,7 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <a
               href="#"
               onClick={e => e.preventDefault()}
@@ -163,8 +176,44 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
               <ExternalLink size={11} />
               JIRA
             </a>
+            {onNewConversation && (
+              <button
+                onClick={() => { onNewConversation(); setShowHistory(false) }}
+                disabled={isBuilding}
+                title="New chat"
+                className="p-1 rounded transition-all"
+                style={{ color: isBuilding ? 'var(--color-text-muted)' : 'var(--color-text-secondary)', opacity: isBuilding ? 0.4 : 1 }}
+              >
+                <Plus size={13} />
+              </button>
+            )}
+            {onSwitchConversation && conversations.length > 0 && (
+              <button
+                onClick={() => setShowHistory(h => !h)}
+                disabled={isBuilding}
+                title="Chat history"
+                className="p-1 rounded transition-all"
+                style={{
+                  color: showHistory ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  opacity: isBuilding ? 0.4 : 1,
+                }}
+              >
+                <History size={13} />
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Chat history panel */}
+        {showHistory && conversations.length > 0 && (
+          <ConversationHistory
+            conversations={conversations}
+            activeConversationId={activeConversationId ?? null}
+            onSelect={conv => { onSwitchConversation?.(conv); setShowHistory(false) }}
+            onRename={onRenameConversation ?? (() => {})}
+            onClose={() => setShowHistory(false)}
+          />
+        )}
 
         {/* Story Details collapsible */}
         <div className="mt-2">
@@ -383,6 +432,113 @@ function EmptyState({ story, TypeIcon }: { story: JiraStory; TypeIcon: React.Ele
         <p className="text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
           Start in <strong style={{ color: 'var(--color-text-secondary)' }}>Plan mode</strong> to discuss the approach, then switch to <strong style={{ color: 'var(--color-text-secondary)' }}>Agent mode</strong> to build.
         </p>
+      </div>
+    </div>
+  )
+}
+
+function ConversationHistory({
+  conversations,
+  activeConversationId,
+  onSelect,
+  onRename,
+  onClose,
+}: {
+  conversations: Conversation[]
+  activeConversationId: string | null
+  onSelect: (conv: Conversation) => void
+  onRename: (id: string, title: string) => void
+  onClose: () => void
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+
+  const startEdit = (conv: Conversation, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingId(conv.id)
+    setEditValue(conv.title ?? '')
+  }
+
+  const commitEdit = (id: string) => {
+    if (editValue.trim()) onRename(id, editValue.trim())
+    setEditingId(null)
+  }
+
+  return (
+    <div
+      className="mt-2 rounded-lg overflow-hidden"
+      style={{ border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-3 py-2"
+        style={{ borderBottom: '1px solid var(--color-border)' }}
+      >
+        <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+          Chat History
+        </span>
+        <button onClick={onClose} className="p-0.5 rounded" style={{ color: 'var(--color-text-muted)' }}>
+          <X size={12} />
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="max-h-48 overflow-y-auto">
+        {conversations.map(conv => {
+          const isActive = conv.id === activeConversationId
+          return (
+            <div
+              key={conv.id}
+              onClick={() => editingId !== conv.id && onSelect(conv)}
+              className="flex items-center gap-2 px-3 py-2 cursor-pointer"
+              style={{
+                background: isActive ? 'rgba(255,54,33,0.06)' : 'transparent',
+                borderLeft: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
+              }}
+            >
+              {/* Active dot */}
+              <span
+                className="shrink-0 w-1.5 h-1.5 rounded-full"
+                style={{ background: isActive ? 'var(--color-accent)' : 'transparent' }}
+              />
+
+              {/* Title / inline edit */}
+              {editingId === conv.id ? (
+                <input
+                  autoFocus
+                  className="flex-1 text-xs bg-transparent outline-none border-b"
+                  style={{ color: 'var(--color-text-primary)', borderColor: 'var(--color-accent)' }}
+                  value={editValue}
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={() => commitEdit(conv.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') commitEdit(conv.id)
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span className="flex-1 text-xs truncate" style={{ color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+                  {conv.title ?? 'Untitled chat'}
+                </span>
+              )}
+
+              {/* Rename pencil */}
+              {editingId !== conv.id && (
+                <button
+                  onClick={e => startEdit(conv, e)}
+                  className="shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: 'var(--color-text-muted)' }}
+                  title="Rename"
+                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                  onMouseLeave={e => (e.currentTarget.style.opacity = isActive ? '0.6' : '0')}
+                >
+                  <Pencil size={10} />
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

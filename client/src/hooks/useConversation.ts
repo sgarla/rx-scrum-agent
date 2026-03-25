@@ -6,6 +6,7 @@ import {
   fetchConversationStatus,
   invokeAgent,
   stopAgent,
+  updateConversation,
 } from '../lib/api'
 import type {
   ChatMessage,
@@ -17,6 +18,7 @@ import type {
 
 interface UseConversationReturn {
   conversation: Conversation | null
+  conversations: Conversation[]
   messages: ChatMessage[]
   isBuilding: boolean
   conversationLoading: boolean
@@ -25,10 +27,14 @@ interface UseConversationReturn {
   sendMessage: (text: string, mode?: 'plan' | 'agent') => Promise<void>
   stop: () => Promise<void>
   error: string | null
+  createNewConversation: () => Promise<void>
+  switchConversation: (conv: Conversation) => void
+  renameConversation: (id: string, title: string) => Promise<void>
 }
 
 export function useConversation(storyKey: string | null): UseConversationReturn {
   const [conversation, setConversation] = useState<Conversation | null>(null)
+  const [conversations, setConversations] = useState<Conversation[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isBuilding, setIsBuilding] = useState(false)
   const [conversationLoading, setConversationLoading] = useState(false)
@@ -37,71 +43,6 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
 
   const sseRef = useRef<EventSource | null>(null)
   const executionRef = useRef<string | null>(null)
-
-  // Load (or reset) conversation when story changes
-  useEffect(() => {
-    // Reset current state immediately
-    setConversation(null)
-    setMessages([])
-    setIsBuilding(false)
-    setCurrentExecutionId(null)
-    setError(null)
-    executionRef.current = null
-    if (sseRef.current) {
-      sseRef.current.close()
-      sseRef.current = null
-    }
-
-    if (!storyKey) return
-
-    setConversationLoading(true)
-
-    // Attempt to load an existing conversation from the DB
-    fetchConversationsByStory(storyKey)
-      .then(convs => {
-        if (convs.length === 0) return
-
-        const conv = convs[0]
-        setConversation(conv)
-
-        // Load full message history, then check live status for active SSE.
-        return fetchConversationFull(conv.id)
-          .then(full => {
-            const allMsgs = (full.messages ?? []) as import('../lib/types').StoredMessage[]
-            const hasBlocksRows = allMsgs.some(m => m.message_type === 'blocks')
-
-            const msgs: ChatMessage[] = []
-            for (const m of allMsgs) {
-              if (m.message_type === 'blocks') {
-                // Rich blocks row saved on completion — reconstruct WorkSection on reload
-                const blocks = Array.isArray(m.metadata) ? m.metadata as import('../lib/types').ContentBlock[] : null
-                if (blocks && blocks.length > 0) {
-                  msgs.push({ id: m.id, role: m.role, blocks, timestamp: new Date(m.created_at) })
-                }
-              } else if (m.message_type === 'text' && m.role === 'user') {
-                msgs.push({ id: m.id, role: 'user', text: m.content, timestamp: new Date(m.created_at) })
-              } else if (m.message_type === 'text' && m.role === 'assistant' && !hasBlocksRows) {
-                // Fallback: old conversations without blocks rows — show as plain text
-                msgs.push({ id: m.id, role: 'assistant', text: m.content, timestamp: new Date(m.created_at) })
-              }
-              // Skip tool_use rows and assistant text rows when blocks rows exist
-            }
-            setMessages(msgs)
-
-            return fetchConversationStatus(conv.id)
-          })
-          .then(status => {
-            if (status.status === 'building' && status.execution_id) {
-              setIsBuilding(true)
-              setCurrentExecutionId(status.execution_id)
-              executionRef.current = status.execution_id
-              streamExecution(status.execution_id)
-            }
-          })
-      })
-      .catch(() => {})
-      .finally(() => setConversationLoading(false))
-  }, [storyKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages(prev => [...prev, msg])
@@ -248,6 +189,74 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     [addMessage, updateLastMessage]
   )
 
+  // Shared helper: load messages for a conversation and connect SSE if live
+  const loadConversationMessages = useCallback(async (conv: Conversation) => {
+    setConversation(conv)
+    setMessages([])
+    setIsBuilding(false)
+    setCurrentExecutionId(null)
+    executionRef.current = null
+    if (sseRef.current) {
+      sseRef.current.close()
+      sseRef.current = null
+    }
+
+    const full = await fetchConversationFull(conv.id)
+    const allMsgs = (full.messages ?? []) as import('../lib/types').StoredMessage[]
+    const hasBlocksRows = allMsgs.some(m => m.message_type === 'blocks')
+
+    const msgs: ChatMessage[] = []
+    for (const m of allMsgs) {
+      if (m.message_type === 'blocks') {
+        const blocks = Array.isArray(m.metadata) ? m.metadata as import('../lib/types').ContentBlock[] : null
+        if (blocks && blocks.length > 0) {
+          msgs.push({ id: m.id, role: m.role, blocks, timestamp: new Date(m.created_at) })
+        }
+      } else if (m.message_type === 'text' && m.role === 'user') {
+        msgs.push({ id: m.id, role: 'user', text: m.content, timestamp: new Date(m.created_at) })
+      } else if (m.message_type === 'text' && m.role === 'assistant' && !hasBlocksRows) {
+        msgs.push({ id: m.id, role: 'assistant', text: m.content, timestamp: new Date(m.created_at) })
+      }
+    }
+    setMessages(msgs)
+
+    const status = await fetchConversationStatus(conv.id)
+    if (status.status === 'building' && status.execution_id) {
+      setIsBuilding(true)
+      setCurrentExecutionId(status.execution_id)
+      executionRef.current = status.execution_id
+      streamExecution(status.execution_id)
+    }
+  }, [streamExecution]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load (or reset) conversation when story changes
+  useEffect(() => {
+    setConversation(null)
+    setConversations([])
+    setMessages([])
+    setIsBuilding(false)
+    setCurrentExecutionId(null)
+    setError(null)
+    executionRef.current = null
+    if (sseRef.current) {
+      sseRef.current.close()
+      sseRef.current = null
+    }
+
+    if (!storyKey) return
+
+    setConversationLoading(true)
+
+    fetchConversationsByStory(storyKey)
+      .then(convs => {
+        setConversations(convs)
+        if (convs.length === 0) return
+        return loadConversationMessages(convs[0])
+      })
+      .catch(() => {})
+      .finally(() => setConversationLoading(false))
+  }, [storyKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const ensureConversation = useCallback(async (storyKey: string): Promise<Conversation> => {
     if (conversation) return conversation
     const conv = await createConversation(storyKey)
@@ -330,8 +339,39 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     })
   }, [currentExecutionId, addMessage])
 
+  const createNewConversation = useCallback(async () => {
+    if (!storyKey) return
+    setError(null)
+    setMessages([])
+    setIsBuilding(false)
+    setCurrentExecutionId(null)
+    executionRef.current = null
+    if (sseRef.current) {
+      sseRef.current.close()
+      sseRef.current = null
+    }
+    const conv = await createConversation(storyKey)
+    setConversation(conv)
+    setConversations(prev => [conv, ...prev])
+  }, [storyKey])
+
+  const switchConversation = useCallback((conv: Conversation) => {
+    setConversationLoading(true)
+    loadConversationMessages(conv)
+      .catch(() => {})
+      .finally(() => setConversationLoading(false))
+  }, [loadConversationMessages])
+
+  const renameConversation = useCallback(async (id: string, title: string) => {
+    if (!title.trim()) return
+    const updated = await updateConversation(id, title.trim())
+    setConversations(prev => prev.map(c => c.id === id ? updated : c))
+    setConversation(prev => prev?.id === id ? updated : prev)
+  }, [])
+
   return {
     conversation,
+    conversations,
     messages,
     isBuilding,
     conversationLoading,
@@ -340,5 +380,8 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     sendMessage,
     stop,
     error,
+    createNewConversation,
+    switchConversation,
+    renameConversation,
   }
 }

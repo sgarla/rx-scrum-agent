@@ -171,12 +171,25 @@ def _migrate_asset_columns(bind):
                 conn.rollback()  # Column already exists — ignore
 
 
+def _migrate_conversation_columns(bind):
+    """Add new columns to conversations table if they don't exist."""
+    import sqlalchemy
+    with bind.connect() as conn:
+        try:
+            conn.execute(sqlalchemy.text("ALTER TABLE conversations ADD COLUMN title VARCHAR(200)"))
+            conn.commit()
+            logger.info("Migrated: added column conversations.title")
+        except Exception:
+            conn.rollback()  # Column already exists — ignore
+
+
 def init_db():
     """Create all tables. Raises if the database is unavailable."""
     import sqlalchemy
     from . import models  # noqa: F401 - ensure models are registered
     Base.metadata.create_all(bind=engine)
     _migrate_asset_columns(engine)
+    _migrate_conversation_columns(engine)
     # Grant read access to all authenticated users so the SQL editor and foreign catalog can query tables
     if not USE_SQLITE:
         try:

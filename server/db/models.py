@@ -25,6 +25,7 @@ class Conversation(Base):
     story_json: Mapped[str] = mapped_column(Text, nullable=False)  # JSON snapshot of story
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="idle")  # idle|building|done
     session_id: Mapped[str | None] = mapped_column(Text, nullable=True)  # claude-agent-sdk session
+    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
 
@@ -43,6 +44,7 @@ class Conversation(Base):
             "story_key": self.story_key,
             "status": self.status,
             "session_id": self.session_id,
+            "title": self.title,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "message_count": len(self.messages) if self.messages else 0,
