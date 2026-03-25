@@ -1,4 +1,5 @@
-import { Box, ExternalLink, Layers, RefreshCw } from 'lucide-react'
+import { Box, ChevronDown, ChevronRight, ExternalLink, Layers, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 import type { AssetSession, JiraStory } from '../../lib/types'
 import { AssetCard } from './AssetCard'
 
@@ -22,6 +23,18 @@ function formatSessionDate(iso: string | null): string {
 
 export function AssetsPanel({ story, sessions, loading, isBuilding, workspaceUrl, onRefresh }: Props) {
   const totalAssets = sessions.reduce((sum, s) => sum + s.assets.length, 0)
+  // Latest session open by default, older ones collapsed
+  const latestSessionNum = sessions.length > 0 ? Math.max(...sessions.map(s => s.session_number)) : -1
+  const [openSessions, setOpenSessions] = useState<Set<number>>(new Set([latestSessionNum]))
+
+  const toggleSession = (num: number) => {
+    setOpenSessions(prev => {
+      const next = new Set(prev)
+      if (next.has(num)) next.delete(num)
+      else next.add(num)
+      return next
+    })
+  }
 
   return (
     <div className="panel" style={{ width: '300px', minWidth: '260px', maxWidth: '340px' }}>
@@ -79,35 +92,42 @@ export function AssetsPanel({ story, sessions, loading, isBuilding, workspaceUrl
           <EmptyState isBuilding={isBuilding} hasStory={!!story} />
         ) : (
           <div>
-            {sessions.map(session => (
-              <div key={session.session_number} className="mb-5">
-                {/* Session header */}
-                <div
-                  className="flex items-center gap-2 mb-2 pb-1"
-                  style={{ borderBottom: '1px solid var(--color-border)' }}
-                >
-                  <span
-                    className="text-xs font-semibold px-1.5 py-0.5 rounded"
-                    style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8' }}
+            {sessions.map(session => {
+              const isOpen = openSessions.has(session.session_number)
+              return (
+                <div key={session.session_number} className="mb-3">
+                  {/* Session header — collapsible */}
+                  <button
+                    onClick={() => toggleSession(session.session_number)}
+                    className="w-full flex items-center gap-2 mb-1.5 pb-1.5 text-left"
+                    style={{ borderBottom: '1px solid var(--color-border)' }}
                   >
-                    Session {session.session_number}
-                  </span>
-                  {session.session_created_at && (
-                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      {formatSessionDate(session.session_created_at)}
+                    {isOpen
+                      ? <ChevronDown size={11} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+                      : <ChevronRight size={11} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />}
+                    <span
+                      className="text-xs font-semibold px-1.5 py-0.5 rounded"
+                      style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8' }}
+                    >
+                      Session {session.session_number}
                     </span>
-                  )}
-                  <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>
-                    {session.assets.length} asset{session.assets.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
+                    {session.session_created_at && (
+                      <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                        {formatSessionDate(session.session_created_at)}
+                      </span>
+                    )}
+                    <span className="text-xs ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+                      {session.assets.length} asset{session.assets.length !== 1 ? 's' : ''}
+                    </span>
+                  </button>
 
-                {/* Assets in this session */}
-                {session.assets.map(asset => (
-                  <AssetCard key={asset.id} asset={asset} />
-                ))}
-              </div>
-            ))}
+                  {/* Assets in this session — hidden when collapsed */}
+                  {isOpen && session.assets.map(asset => (
+                    <AssetCard key={asset.id} asset={asset} />
+                  ))}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>

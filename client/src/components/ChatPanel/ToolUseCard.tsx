@@ -38,7 +38,7 @@ interface Props {
 }
 
 export function ToolUseCard({ block, resultBlock }: Props) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(resultBlock?.is_error ?? false)
   const icon = TOOL_ICONS[block.name] ?? '🔧'
 
   const resultText = resultBlock
@@ -50,6 +50,7 @@ export function ToolUseCard({ block, resultBlock }: Props) {
     : null
 
   const isError = resultBlock?.is_error
+  const errorPreview = isError && resultText ? resultText.slice(0, 150) : null
 
   return (
     <div
@@ -95,6 +96,15 @@ export function ToolUseCard({ block, resultBlock }: Props) {
           <ChevronRight size={12} style={{ color: 'var(--color-text-muted)' }} />
         )}
       </button>
+      {/* Error preview — always visible even when collapsed */}
+      {!expanded && errorPreview && (
+        <div
+          className="px-3 pb-2 text-xs"
+          style={{ color: '#FCA5A5', fontFamily: 'JetBrains Mono, monospace', wordBreak: 'break-word' }}
+        >
+          {errorPreview}{resultText && resultText.length > 150 ? '…' : ''}
+        </div>
+      )}
 
       {/* Expanded: input + output */}
       {expanded && (

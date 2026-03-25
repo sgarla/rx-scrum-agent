@@ -28,7 +28,8 @@ export interface StoredMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
-  message_type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'summary'
+  message_type: 'text' | 'tool_use' | 'tool_result' | 'thinking' | 'summary' | 'blocks'
+  metadata?: ContentBlock[] | Record<string, unknown> | null
   created_at: string
 }
 
@@ -88,6 +89,25 @@ export interface ChatMessage {
   text?: string
   timestamp: Date
   isStreaming?: boolean
+}
+
+export type StepStatus =
+  | 'pending'    // not started yet
+  | 'running'    // tool_use received, no result yet
+  | 'done'       // tool_result received, success
+  | 'error'      // tool_result received, is_error=true
+  | 'stopped'    // user clicked Stop on this step
+  | 'cancelled'  // step never ran (stop/error before it was reached)
+
+export interface ExecutionStep {
+  id: string           // tool_use_id or "plan-N" for plan-only steps
+  label: string
+  detail?: string      // file path, table name, SQL snippet, etc.
+  status: StepStatus
+  toolName?: string
+  startedAt?: number    // Date.now() when status → running (for slow-step detection)
+  slowWarning?: boolean
+  slowSeconds?: number  // how many seconds this step has been running
 }
 
 // SSE event types

@@ -16,7 +16,8 @@ import os
 logger = logging.getLogger(__name__)
 
 CATALOG = os.getenv("DEFAULT_CATALOG", "rxcorp")
-SCHEMA = "rxscrum_agent"
+SCHEMA = os.getenv("DELTA_SYNC_SCHEMA", "rxscrum_agent")
+DELTA_SYNC_ENABLED = os.getenv("DELTA_SYNC_ENABLED", "false").lower() in ("1", "true", "yes")
 HOST = os.getenv("DATABRICKS_HOST", "").rstrip("/")
 TOKEN = os.getenv("DATABRICKS_TOKEN", "")
 WAREHOUSE_ID = os.getenv("GENIE_WAREHOUSE_ID", "")
@@ -88,6 +89,8 @@ def _esc(value) -> str:
 
 def sync_to_delta(story_key=None) -> None:
     """Sync stories/conversations/assets from Lakebase to UC Delta tables."""
+    if not DELTA_SYNC_ENABLED:
+        return
     if not HOST:
         logger.warning("Delta sync skipped: DATABRICKS_HOST not configured")
         return

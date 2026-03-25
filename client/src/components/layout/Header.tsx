@@ -60,7 +60,7 @@ export function Header({
       <div className="flex items-center gap-3">
         <DatabricksLogo />
         <div className="flex flex-col leading-none">
-          <span className="text-sm font-semibold text-white tracking-tight">RxCorp Bricks Agent</span>
+          <span className="text-sm font-semibold text-white tracking-tight">DMA-IDW-DEB</span>
           <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
             Powered by Databricks
           </span>

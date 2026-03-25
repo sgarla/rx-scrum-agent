@@ -25,25 +25,32 @@ CLIENT_DIST = Path(__file__).parent.parent / "client" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    logger.info("Initializing database...")
-    try:
-        init_db()
-    except Exception as e:
-        logger.error(f"DATABASE INIT FAILED — {type(e).__name__}: {e}", exc_info=True)
-        raise
+    import threading
 
-    # Ensure agent work directory exists
+    # Ensure agent work directory exists (fast, no network)
     work_dir = Path(os.getenv("WORK_DIR", "./agent_work"))
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    # Pre-load Databricks tools at startup (avoids cold start on first build)
-    try:
-        from .services.agent import _load_databricks_tools
-        server, tools = _load_databricks_tools()
-        logger.info(f"Pre-loaded {len(tools)} Databricks tools")
-    except Exception as e:
-        logger.warning(f"Could not pre-load Databricks tools: {e}")
+    # Run DB init and tool preload in daemon threads so uvicorn starts
+    # immediately and health checks succeed before slow SDK/Lakebase calls finish.
+    def _init_db_bg():
+        try:
+            logger.info("Initializing database (background)...")
+            init_db()
+            logger.info("Database initialized.")
+        except Exception as e:
+            logger.error(f"DATABASE INIT FAILED — {type(e).__name__}: {e}", exc_info=True)
+
+    def _preload_tools():
+        try:
+            from .services.agent import _load_databricks_tools
+            _, tools = _load_databricks_tools()
+            logger.info(f"Pre-loaded {len(tools)} Databricks tools")
+        except Exception as e:
+            logger.warning(f"Could not pre-load Databricks tools: {e}")
+
+    threading.Thread(target=_init_db_bg, daemon=True, name="db-init").start()
+    threading.Thread(target=_preload_tools, daemon=True, name="tool-preload").start()
 
     logger.info("Virtual Scrum Member demo ready.")
     yield

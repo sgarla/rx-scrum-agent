@@ -1,7 +1,7 @@
-import { ChevronDown, ChevronRight, ExternalLink, Package } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, ExternalLink, Loader2, Package, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
-import type { ChatMessage, TextBlock, ThinkingBlock, ToolResultBlock, ToolUseBlock } from '../../lib/types'
+import type { ChatMessage, ContentBlock, TextBlock, ThinkingBlock, ToolResultBlock, ToolUseBlock } from '../../lib/types'
 import { ToolUseCard } from './ToolUseCard'
 
 interface Props {
@@ -45,10 +45,17 @@ function stripAssetsSummary(text: string): string {
   return text.replace(/<assets_summary>[\s\S]*?<\/assets_summary>/gi, '').trim()
 }
 
+function stripExecutionPlan(text: string): string {
+  return text.replace(/<execution_plan>[\s\S]*?<\/execution_plan>/gi, '').trim()
+}
+
+function cleanText(raw: string): string {
+  return stripExecutionPlan(stripAssetsSummary(raw)).trim()
+}
+
 function InlineAssetSummary({ assets }: { assets: ParsedAsset[] }) {
   const [open, setOpen] = useState(true)
 
-  // Group by type for the header
   const typeCounts: Record<string, number> = {}
   for (const a of assets) typeCounts[a.type] = (typeCounts[a.type] ?? 0) + 1
 
@@ -57,7 +64,6 @@ function InlineAssetSummary({ assets }: { assets: ParsedAsset[] }) {
       className="rounded-xl mb-3 overflow-hidden"
       style={{ border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}
     >
-      {/* Header */}
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
@@ -67,7 +73,6 @@ function InlineAssetSummary({ assets }: { assets: ParsedAsset[] }) {
         <span className="text-xs font-semibold flex-1" style={{ color: 'var(--color-text-primary)' }}>
           {assets.length} asset{assets.length !== 1 ? 's' : ''} created
         </span>
-        {/* type pills */}
         <div className="flex items-center gap-1 flex-wrap">
           {Object.entries(typeCounts).map(([type, count]) => (
             <span
@@ -87,8 +92,6 @@ function InlineAssetSummary({ assets }: { assets: ParsedAsset[] }) {
           ? <ChevronDown size={12} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
           : <ChevronRight size={12} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />}
       </button>
-
-      {/* Asset list */}
       {open && (
         <div className="p-2 space-y-1.5">
           {assets.map((asset, i) => {
@@ -144,6 +147,211 @@ function InlineAssetSummary({ assets }: { assets: ParsedAsset[] }) {
   )
 }
 
+// ── Render a sequence of text/thinking blocks as prose ───────────────────────
+
+function renderProseBlocks(blocks: ContentBlock[], keyPrefix: string): React.ReactNode[] {
+  const result: React.ReactNode[] = []
+  let buf = ''
+  let i = 0
+
+  const flush = () => {
+    if (!buf.trim()) { buf = ''; return }
+    const raw = buf
+    buf = ''
+    const assets = parseAssetsSummary(raw)
+    const text = cleanText(raw)
+    if (text) {
+      result.push(
+        <div key={`${keyPrefix}-t${i++}`} className="prose-agent text-sm mb-3">
+          <ReactMarkdown>{text}</ReactMarkdown>
+        </div>
+      )
+    }
+    if (assets.length > 0) {
+      result.push(<InlineAssetSummary key={`${keyPrefix}-a${i++}`} assets={assets} />)
+    }
+  }
+
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      buf += (block as TextBlock).text
+    } else if (block.type === 'thinking') {
+      flush()
+      result.push(
+        <div
+          key={`${keyPrefix}-th${i++}`}
+          className="text-xs italic mb-2 px-3 py-2 rounded"
+          style={{
+            color: 'var(--color-text-muted)',
+            background: 'rgba(255,255,255,0.03)',
+            borderLeft: '2px solid var(--color-border)',
+          }}
+        >
+          <span style={{ color: 'var(--color-text-muted)' }}>💭 </span>
+          {(block as ThinkingBlock).thinking.slice(0, 200)}
+          {(block as ThinkingBlock).thinking.length > 200 && '…'}
+        </div>
+      )
+    }
+  }
+  flush()
+  return result
+}
+
+// ── Work section — collapsible block containing ALL tool activity ─────────────
+
+function WorkSection({
+  blocks,
+  toolMap,
+  isStreaming,
+}: {
+  blocks: ContentBlock[]
+  toolMap: Map<string, ToolResultBlock>
+  isStreaming?: boolean
+}) {
+  const toolBlocks = blocks.filter(b => b.type === 'tool_use') as ToolUseBlock[]
+  const doneCount = toolBlocks.filter(t => toolMap.get(t.id) && !toolMap.get(t.id)!.is_error).length
+  const errorCount = toolBlocks.filter(t => toolMap.get(t.id)?.is_error).length
+  const runningCount = toolBlocks.length - doneCount - errorCount
+  const activelyRunning = runningCount > 0
+  const hasError = errorCount > 0
+
+  // Status
+  let statusText: string
+  let statusColor: string
+  if (activelyRunning) {
+    statusText = doneCount === 0
+      ? `Building…`
+      : `Building… (${doneCount}/${toolBlocks.length} done)`
+    statusColor = '#F59E0B'
+  } else if (hasError) {
+    statusText = `${toolBlocks.length} step${toolBlocks.length !== 1 ? 's' : ''} · ${errorCount} error${errorCount !== 1 ? 's' : ''}`
+    statusColor = '#EF4444'
+  } else {
+    statusText = `${toolBlocks.length} step${toolBlocks.length !== 1 ? 's' : ''} · done`
+    statusColor = 'var(--color-done)'
+  }
+
+  // First error preview for subtitle
+  const firstErrTool = toolBlocks.find(t => toolMap.get(t.id)?.is_error)
+  const firstErrResult = firstErrTool ? toolMap.get(firstErrTool.id) : undefined
+  const errPreview = firstErrResult
+    ? (typeof firstErrResult.content === 'string'
+        ? firstErrResult.content
+        : Array.isArray(firstErrResult.content)
+          ? firstErrResult.content.map(c => (typeof c === 'object' && 'text' in c ? (c as { text: string }).text : '')).join('')
+          : ''
+      ).replace(/\n/g, ' ').slice(0, 150)
+    : null
+
+  const [open, setOpen] = useState(false)
+
+  // Render work blocks: text + thinking inline, tool cards as ToolUseCard
+  const workContent: React.ReactNode[] = []
+  let textBuf = ''
+  let wi = 0
+
+  const flushWorkText = () => {
+    if (!textBuf.trim()) { textBuf = ''; return }
+    const raw = textBuf
+    textBuf = ''
+    const text = cleanText(raw)
+    if (text) {
+      workContent.push(
+        <div key={`wt${wi++}`} className="prose-agent text-sm py-1">
+          <ReactMarkdown>{text}</ReactMarkdown>
+        </div>
+      )
+    }
+  }
+
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      textBuf += (block as TextBlock).text
+    } else if (block.type === 'thinking') {
+      flushWorkText()
+      workContent.push(
+        <div
+          key={`wth${wi++}`}
+          className="text-xs italic px-2 py-1.5 rounded my-1"
+          style={{
+            color: 'var(--color-text-muted)',
+            background: 'rgba(255,255,255,0.03)',
+            borderLeft: '2px solid var(--color-border)',
+          }}
+        >
+          💭 {(block as ThinkingBlock).thinking.slice(0, 200)}
+          {(block as ThinkingBlock).thinking.length > 200 && '…'}
+        </div>
+      )
+    } else if (block.type === 'tool_use') {
+      flushWorkText()
+      const tb = block as ToolUseBlock
+      workContent.push(
+        <ToolUseCard key={tb.id} block={tb} resultBlock={toolMap.get(tb.id)} />
+      )
+    }
+    // tool_result: handled via toolMap
+  }
+  flushWorkText()
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden mb-3"
+      style={{
+        border: `1px solid ${hasError ? '#EF444440' : 'var(--color-border)'}`,
+        background: hasError ? 'rgba(239,68,68,0.03)' : 'var(--color-bg)',
+      }}
+    >
+      {/* Header */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-start gap-2 px-3 py-2.5 text-left"
+        style={{ background: 'transparent' }}
+      >
+        {/* Status icon */}
+        <div className="mt-0.5 shrink-0">
+          {activelyRunning && <Loader2 size={13} className="animate-spin" style={{ color: '#F59E0B' }} />}
+          {!activelyRunning && hasError && <XCircle size={13} style={{ color: '#EF4444' }} />}
+          {!activelyRunning && !hasError && <CheckCircle2 size={13} style={{ color: 'var(--color-done)' }} />}
+        </div>
+
+        {/* Label + error subtitle */}
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-medium" style={{ color: statusColor }}>
+            {statusText}
+          </span>
+          {hasError && errPreview && (
+            <p
+              className="text-xs mt-0.5"
+              style={{ color: '#FCA5A5', opacity: 0.85, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+            >
+              {errPreview}{errPreview.length === 150 && '…'}
+            </p>
+          )}
+        </div>
+
+        {/* Chevron */}
+        <div className="mt-0.5 shrink-0">
+          {open
+            ? <ChevronDown size={12} style={{ color: 'var(--color-text-muted)' }} />
+            : <ChevronRight size={12} style={{ color: 'var(--color-text-muted)' }} />}
+        </div>
+      </button>
+
+      {/* Content */}
+      {open && (
+        <div
+          className="px-3 pb-3"
+          style={{ borderTop: '1px solid var(--color-border)' }}
+        >
+          {workContent}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 export function AgentMessage({ message, showTime }: Props) {
@@ -165,76 +373,53 @@ export function AgentMessage({ message, showTime }: Props) {
     )
   }
 
-  // Assistant message — render blocks
+  // Build blocks array
   const blocks = message.blocks ?? (message.text ? [{ type: 'text' as const, text: message.text }] : [])
 
-  // Build tool use → result pairs
+  // Build toolMap: tool_use_id → tool_result
   const toolMap = new Map<string, ToolResultBlock>()
   for (const block of blocks) {
     if (block.type === 'tool_result') {
-      toolMap.set(block.tool_use_id, block as ToolResultBlock)
+      toolMap.set((block as ToolResultBlock).tool_use_id, block as ToolResultBlock)
     }
   }
+
+  // Find split points
+  const firstToolIdx = blocks.findIndex(b => b.type === 'tool_use')
+  const lastActivityIdx = blocks.reduce(
+    (last, b, i) => (b.type === 'tool_use' || b.type === 'tool_result') ? i : last,
+    -1
+  )
+  const hasTools = firstToolIdx !== -1
 
   const rendered: React.ReactNode[] = []
-  let textBuffer = ''
-  let i = 0
 
-  const flushText = () => {
-    if (!textBuffer.trim()) { textBuffer = ''; return }
-    const raw = textBuffer
-    textBuffer = ''
+  if (!hasTools) {
+    // No tool calls — render all as plain prose (plan mode / conversational)
+    rendered.push(...renderProseBlocks(blocks, 'p'))
+  } else {
+    const preamble   = blocks.slice(0, firstToolIdx)
+    const work       = blocks.slice(firstToolIdx, lastActivityIdx + 1)
+    const conclusion = blocks.slice(lastActivityIdx + 1)
 
-    // Parse out any <assets_summary> block
-    const assets = parseAssetsSummary(raw)
-    const cleanText = stripAssetsSummary(raw)
+    // Intro text — always visible above the work section
+    rendered.push(...renderProseBlocks(preamble, 'pre'))
 
-    if (cleanText.trim()) {
-      rendered.push(
-        <div key={`text-${i++}`} className="prose-agent text-sm mb-3">
-          <ReactMarkdown>{cleanText}</ReactMarkdown>
-        </div>
-      )
-    }
-    if (assets.length > 0) {
-      rendered.push(<InlineAssetSummary key={`assets-${i++}`} assets={assets} />)
-    }
+    // ONE work section with everything inside
+    rendered.push(
+      <WorkSection
+        key="work"
+        blocks={work}
+        toolMap={toolMap}
+        isStreaming={message.isStreaming}
+      />
+    )
+
+    // Conclusion text — always visible below the work section
+    rendered.push(...renderProseBlocks(conclusion, 'con'))
   }
 
-  for (const block of blocks) {
-    if (block.type === 'text') {
-      textBuffer += (block as TextBlock).text
-    } else if (block.type === 'thinking') {
-      flushText()
-      rendered.push(
-        <div
-          key={`think-${i++}`}
-          className="text-xs italic mb-2 px-3 py-2 rounded"
-          style={{
-            color: 'var(--color-text-muted)',
-            background: 'rgba(255,255,255,0.03)',
-            borderLeft: '2px solid var(--color-border)',
-          }}
-        >
-          <span style={{ color: 'var(--color-text-muted)' }}>💭 </span>
-          {(block as ThinkingBlock).thinking.slice(0, 200)}
-          {(block as ThinkingBlock).thinking.length > 200 && '…'}
-        </div>
-      )
-    } else if (block.type === 'tool_use') {
-      flushText()
-      const tb = block as ToolUseBlock
-      const result = toolMap.get(tb.id)
-      rendered.push(
-        <ToolUseCard key={`tool-${tb.id}`} block={tb} resultBlock={result} />
-      )
-    } else if (block.type === 'tool_result') {
-      // Already handled above via toolMap
-    }
-  }
-  flushText()
-
-  // Streaming cursor on last text element
+  // Streaming cursor
   if (message.isStreaming) {
     rendered.push(
       <span

@@ -111,8 +111,13 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
 
     story = json.loads(conv.story_json)
 
-    # Build message history (existing messages + new user message)
-    existing_msgs = [{"role": m.role, "content": m.content} for m in conv.messages]
+    # Build message history (existing messages + new user message).
+    # Skip 'blocks' rows — they have content="" and are only for display.
+    existing_msgs = [
+        {"role": m.role, "content": m.content}
+        for m in conv.messages
+        if m.message_type in ("text", "tool_use")
+    ]
     new_message = {"role": "user", "content": body.message}
     messages = existing_msgs + [new_message]
 
@@ -159,26 +164,48 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
 
             try:
                 from claude_agent_sdk.types import (
-                    AssistantMessage, ResultMessage, TextBlock, ToolUseBlock,
+                    AssistantMessage, ResultMessage, UserMessage,
+                    TextBlock, ThinkingBlock, ToolUseBlock, ToolResultBlock,
                 )
             except ImportError:
                 return
 
             full_text = ""
             final_session_id = _conv_row.session_id
+            current_turn_blocks: list = []
+
+            def _flush_turn_blocks():
+                if current_turn_blocks:
+                    _db.add(Message(
+                        conversation_id=_conv_id,
+                        role="assistant",
+                        content="",
+                        message_type="blocks",
+                        metadata_json=json.dumps(current_turn_blocks),
+                    ))
+                current_turn_blocks.clear()
 
             for event in exec_st.all_events:
                 if isinstance(event, AssistantMessage):
                     for block in event.content:
                         if isinstance(block, TextBlock):
                             full_text += block.text
+                            current_turn_blocks.append({"type": "text", "text": block.text})
                             _db.add(Message(
                                 conversation_id=_conv_id,
                                 role="assistant",
                                 content=block.text,
                                 message_type="text",
                             ))
+                        elif isinstance(block, ThinkingBlock):
+                            current_turn_blocks.append({"type": "thinking", "thinking": block.thinking})
                         elif isinstance(block, ToolUseBlock):
+                            current_turn_blocks.append({
+                                "type": "tool_use",
+                                "id": block.id,
+                                "name": block.name,
+                                "input": block.input,
+                            })
                             _db.add(Message(
                                 conversation_id=_conv_id,
                                 role="assistant",
@@ -190,9 +217,29 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
                                     "input": block.input,
                                 }),
                             ))
+                elif isinstance(event, UserMessage):
+                    for block in event.content:
+                        if isinstance(block, ToolResultBlock):
+                            content = block.content
+                            if hasattr(content, "__iter__") and not isinstance(content, str):
+                                content = [
+                                    {"type": "text", "text": c.text}
+                                    if hasattr(c, "text") else str(c)
+                                    for c in content
+                                ]
+                            current_turn_blocks.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.tool_use_id,
+                                "content": content,
+                                "is_error": getattr(block, "is_error", False),
+                            })
                 elif isinstance(event, ResultMessage):
+                    _flush_turn_blocks()
                     if hasattr(event, "session_id") and event.session_id:
                         final_session_id = event.session_id
+
+            # Flush any remaining blocks if stream ended without a ResultMessage
+            _flush_turn_blocks()
 
             _conv_row.session_id = final_session_id
             _conv_row.status = "idle"
@@ -236,10 +283,14 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
             _db.close()
 
     # Start agent background thread
+    # Don't resume sessions across mode switches — plan and agent modes have
+    # different tool configurations (MCP servers), and resuming a plan session
+    # in agent mode crashes the CLI subprocess.
+    resume_session_id = conv.session_id if body.mode == 'plan' else None
     thread = start_agent_build(
         story=story,
         messages=messages,
-        session_id=conv.session_id,
+        session_id=resume_session_id,
         conversation_id=conv.id,
         put_event=exec_state.put_event,
         on_complete=_save_on_complete,

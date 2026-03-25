@@ -155,6 +155,12 @@ Rules:
 
 _ASSET_SUMMARY_INSTRUCTIONS = _ASSET_SUMMARY_INSTRUCTIONS_TEMPLATE.replace("rxcorp", DEFAULT_CATALOG)
 
+_WORK_PREAMBLE = """
+Before starting any tool calls, briefly state in 1–3 sentences what you are about to do.
+After completing all work, provide a 1–3 sentence summary of what was accomplished.
+Do NOT output XML tags or structured formats — plain natural language only.
+"""
+
 
 def build_story_system_prompt(story: dict) -> str:
     """Build a complete system prompt for building a specific JIRA story."""
@@ -179,6 +185,7 @@ def build_story_system_prompt(story: dict) -> str:
 
 You are an expert **Databricks data engineer and AI practitioner** acting as a virtual scrum team member.
 Your task is to implement the following JIRA user story end-to-end on Databricks.{workspace_line}
+{_WORK_PREAMBLE}
 
 You have access to all Databricks MCP tools (pipelines, SQL, jobs, serving endpoints, Unity Catalog, etc.)
 and the Claude Code built-in tools (Read, Write, Edit, Glob, Grep) for writing code files.
@@ -237,6 +244,7 @@ def build_planning_system_prompt(story: dict) -> str:
 You are in **Plan Mode** — your role is to help the user think through, design, and plan the implementation for this story.
 You will NOT execute any code, create notebooks, run jobs, or use Databricks tools.
 Instead, provide thoughtful analysis, architecture recommendations, step-by-step plans, and answer questions conversationally.
+{_WORK_PREAMBLE}
 
 ## Story: {key} — {summary}
 

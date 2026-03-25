@@ -166,27 +166,39 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
           </div>
         </div>
 
-        {/* AC preview */}
-        {story.acceptance_criteria.length > 0 && (
-          <div className="mt-2">
-            <details>
-              <summary
-                className="text-xs cursor-pointer select-none"
-                style={{ color: 'var(--color-text-muted)' }}
-              >
-                {story.acceptance_criteria.length} acceptance criteria
-              </summary>
-              <ul className="mt-1.5 space-y-1">
-                {story.acceptance_criteria.map((ac, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-xs mt-0.5" style={{ color: 'var(--color-done)' }}>◦</span>
-                    <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{ac}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          </div>
-        )}
+        {/* Story Details collapsible */}
+        <div className="mt-2">
+          <details>
+            <summary
+              className="text-xs cursor-pointer select-none"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
+              Story Details
+            </summary>
+            <div className="mt-2 space-y-2">
+              {story.description && (
+                <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: 'var(--color-text-secondary)' }}>
+                  {story.description}
+                </p>
+              )}
+              {story.acceptance_criteria.length > 0 && (
+                <>
+                  <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>
+                    Acceptance Criteria
+                  </div>
+                  <ul className="space-y-1">
+                    {story.acceptance_criteria.map((ac, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="text-xs mt-0.5 shrink-0" style={{ color: 'var(--color-done)' }}>◦</span>
+                        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{ac}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          </details>
+        </div>
       </div>
 
       {/* Messages area */}
@@ -228,6 +240,7 @@ export function ChatPanel({ story, messages, isBuilding, conversationLoading, er
               )
             })}
 
+            {/* Thinking bubble — shown while building before the agent starts responding */}
             {isBuilding && (messages.length === 0 || messages[messages.length - 1]?.role === 'user') && (
               <div className="flex gap-3 mb-4 animate-fade-in">
                 <div

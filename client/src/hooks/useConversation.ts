@@ -34,6 +34,7 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
   const [conversationLoading, setConversationLoading] = useState(false)
   const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
   const sseRef = useRef<EventSource | null>(null)
   const executionRef = useRef<string | null>(null)
 
@@ -64,18 +65,27 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
         setConversation(conv)
 
         // Load full message history, then check live status for active SSE.
-        // The list/full endpoints never include execution_id — only the status
-        // endpoint returns it when an execution is actively running in stream_manager.
         return fetchConversationFull(conv.id)
           .then(full => {
-            const msgs: ChatMessage[] = (full.messages ?? [])
-              .filter(m => m.message_type === 'text')
-              .map(m => ({
-                id: m.id,
-                role: m.role as 'user' | 'assistant',
-                text: m.content,
-                timestamp: new Date(m.created_at),
-              }))
+            const allMsgs = (full.messages ?? []) as import('../lib/types').StoredMessage[]
+            const hasBlocksRows = allMsgs.some(m => m.message_type === 'blocks')
+
+            const msgs: ChatMessage[] = []
+            for (const m of allMsgs) {
+              if (m.message_type === 'blocks') {
+                // Rich blocks row saved on completion — reconstruct WorkSection on reload
+                const blocks = Array.isArray(m.metadata) ? m.metadata as import('../lib/types').ContentBlock[] : null
+                if (blocks && blocks.length > 0) {
+                  msgs.push({ id: m.id, role: m.role, blocks, timestamp: new Date(m.created_at) })
+                }
+              } else if (m.message_type === 'text' && m.role === 'user') {
+                msgs.push({ id: m.id, role: 'user', text: m.content, timestamp: new Date(m.created_at) })
+              } else if (m.message_type === 'text' && m.role === 'assistant' && !hasBlocksRows) {
+                // Fallback: old conversations without blocks rows — show as plain text
+                msgs.push({ id: m.id, role: 'assistant', text: m.content, timestamp: new Date(m.created_at) })
+              }
+              // Skip tool_use rows and assistant text rows when blocks rows exist
+            }
             setMessages(msgs)
 
             return fetchConversationStatus(conv.id)
@@ -158,6 +168,7 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
           const ev = event as SSEAssistantMessageEvent
           pendingBlocks.push(...ev.blocks)
           flushPending()
+
         } else if (event.type === 'result') {
           if (streamingMsgId) {
             updateLastMessage(msg =>
@@ -192,18 +203,38 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
           seenEventCount = idx
           es.close()
           sseRef.current = null
+          // Clear streaming cursor on the current message before reconnecting —
+          // the replayed events will re-establish it on the rebuilt message
+          if (streamingMsgId) {
+            const idToClear = streamingMsgId
+            updateLastMessage(msg =>
+              msg.id === idToClear ? { ...msg, isStreaming: false } : msg
+            )
+            streamingMsgId = null
+          }
           streamExecution(executionId, idx)
         } else if (event.type === 'error') {
+          // Backend crash / unrecoverable error
           setError((event as { message: string }).message)
           es.close()
           sseRef.current = null
           setIsBuilding(false)
+          setCurrentExecutionId(null)
+          executionRef.current = null
         }
       }
 
       es.onerror = () => {
         es.close()
         sseRef.current = null
+        // Clear streaming cursor so it doesn't stay stuck during reconnect gap
+        if (streamingMsgId) {
+          const idToClear = streamingMsgId
+          updateLastMessage(msg =>
+            msg.id === idToClear ? { ...msg, isStreaming: false } : msg
+          )
+          streamingMsgId = null
+        }
         if (executionRef.current === executionId) {
           const resumeIdx = seenEventCount
           setTimeout(() => {
@@ -228,6 +259,8 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     if (!sk) return
     setError(null)
     setIsBuilding(true)
+    // Safety: clear any stale streaming cursors from previous turns
+    setMessages(prev => prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m))
 
     try {
       const conv = await ensureConversation(sk)
@@ -254,6 +287,8 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     if (!storyKey || !text.trim()) return
     setError(null)
     setIsBuilding(true)
+    // Safety: clear any stale streaming cursors from previous turns
+    setMessages(prev => prev.map(m => m.isStreaming ? { ...m, isStreaming: false } : m))
 
     try {
       const conv = await ensureConversation(storyKey)
@@ -287,7 +322,13 @@ export function useConversation(storyKey: string | null): UseConversationReturn 
     executionRef.current = null
     setIsBuilding(false)
     setCurrentExecutionId(null)
-  }, [currentExecutionId])
+    addMessage({
+      id: `interrupted-${Date.now()}`,
+      role: 'assistant',
+      text: 'Interrupted by user.',
+      timestamp: new Date(),
+    })
+  }, [currentExecutionId, addMessage])
 
   return {
     conversation,

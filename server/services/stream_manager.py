@@ -199,7 +199,26 @@ def _serialize_event(event: Any) -> str:
             })
 
         elif isinstance(event, UserMessage):
-            # Usually synthetic tool results; skip or pass through
+            # Extract tool_result blocks and send them as assistant_message events
+            # so the frontend can build the toolMap and show Done/Error on tool cards.
+            blocks = []
+            for block in event.content:
+                if isinstance(block, ToolResultBlock):
+                    content = block.content
+                    if hasattr(content, "__iter__") and not isinstance(content, str):
+                        content = [
+                            {"type": "text", "text": c.text}
+                            if hasattr(c, "text") else str(c)
+                            for c in content
+                        ]
+                    blocks.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.tool_use_id,
+                        "content": content,
+                        "is_error": getattr(block, "is_error", False),
+                    })
+            if blocks:
+                return json.dumps({"type": "assistant_message", "blocks": blocks})
             return json.dumps({"type": "user_message"})
 
         elif hasattr(event, "type"):
