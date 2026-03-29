@@ -197,3 +197,29 @@ export interface GenieMessage {
   sql?: string | null
   timestamp: Date
 }
+
+// GitHub Issues
+export interface GitHubIssue {
+  key: string
+  number: number
+  title: string
+  body: string
+  state: string
+  html_url: string
+  labels: string[]
+  user_login: string
+  assignee_login: string
+  created_at: string
+  updated_at: string
+}
+
+export interface GitHubIssueFilters {
+  state: 'open' | 'closed' | 'all'
+  search: string
+}
+
+export interface AppSettings extends ServiceNowSettings {
+  github_repo: string
+  github_token_set: boolean
+  github_configured: boolean
+}

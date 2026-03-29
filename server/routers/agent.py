@@ -14,6 +14,7 @@ from ..services.agent import start_agent_build
 from ..services.assets_parser import extract_assets
 from ..services import stream_manager
 from ..stories import get_story, update_story_status
+from ..services.github import get_issue_by_key, parse_github_story_key
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -36,11 +37,37 @@ class InvokeAgentRequest(BaseModel):
 
 @router.post("/conversations")
 async def create_conversation(body: CreateConversationRequest, db: Session = Depends(get_db)):
-    """Create a conversation for a JIRA story or a ServiceNow incident."""
+    """Create a conversation for a JIRA story, ServiceNow incident, or GitHub issue."""
     import re
-    is_incident = bool(re.match(r'^INC\d+$', str(body.story_key), re.IGNORECASE))
+    pk = str(body.story_key)
+    is_incident = bool(re.match(r'^INC\d+$', pk, re.IGNORECASE))
+    is_gh = parse_github_story_key(pk) is not None
 
-    if is_incident:
+    if is_gh:
+        issue = get_issue_by_key(db, pk)
+        if not issue:
+            raise HTTPException(
+                status_code=404,
+                detail="GitHub issue not found. Configure token/repo in Settings or verify the issue exists.",
+            )
+        story = {
+            "key": issue["key"],
+            "type": "github_issue",
+            "summary": issue["title"],
+            "description": issue.get("body") or "",
+            "title": issue["title"],
+            "body": issue.get("body") or "",
+            "labels": issue.get("labels") or [],
+            "state": issue.get("state") or "",
+            "html_url": issue.get("html_url") or "",
+            "number": issue["number"],
+            "assignee": issue.get("assignee_login") or "Unassigned",
+            "priority": "Medium",
+            "story_points": 0,
+            "acceptance_criteria": [],
+            "skill_hint": "databricks-docs",
+        }
+    elif is_incident:
         # Incidents don't have a story entry — create a minimal placeholder
         story = {"key": body.story_key, "type": "incident", "summary": f"Incident {body.story_key}"}
     else:
@@ -155,7 +182,10 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
     # Update conversation status (only show "building" in agent mode — plan mode is conversational)
     conv.status = "building"
     if body.mode == 'agent':
-        update_story_status(conv.story_key, "building")
+        import re as _re
+        _sk = str(conv.story_key)
+        if not _sk.startswith("gh:") and not _re.match(r'^INC\d+$', _sk, _re.IGNORECASE):
+            update_story_status(conv.story_key, "building")
     db.commit()
 
     # Create execution in stream manager
@@ -268,7 +298,8 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
             # Story status reverts to "todo" after agent completes — user must explicitly mark as Done
             # Skip status update for ServiceNow incidents (they are managed externally)
             import re
-            if not re.match(r'^INC\d+$', str(_story_key), re.IGNORECASE):
+            _sk = str(_story_key)
+            if not re.match(r'^INC\d+$', _sk, re.IGNORECASE) and not _sk.startswith('gh:'):
                 update_story_status(_story_key, "todo")
 
             assets = [] if _mode == 'plan' else extract_assets(full_text)

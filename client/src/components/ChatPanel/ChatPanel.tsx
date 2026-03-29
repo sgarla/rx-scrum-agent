@@ -21,6 +21,8 @@ import { ChatInput } from './ChatInput'
 
 interface Props {
   story: JiraStory | null
+  /** When set (e.g. GitHub issue), replaces the placeholder JIRA link in the header */
+  externalIssueLink?: { label: string; url: string } | null
   messages: ChatMessage[]
   isBuilding: boolean
   conversationLoading?: boolean
@@ -64,7 +66,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 }
 
 export function ChatPanel({
-  story, messages, isBuilding, conversationLoading, error, onSendMessage, onStop,
+  story, externalIssueLink, messages, isBuilding, conversationLoading, error, onSendMessage, onStop,
   conversations = [], activeConversationId, onNewConversation, onSwitchConversation, onRenameConversation,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -167,15 +169,28 @@ export function ChatPanel({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <a
-              href="#"
-              onClick={e => e.preventDefault()}
-              className="inline-flex items-center gap-1 text-xs"
-              style={{ color: 'var(--color-text-muted)' }}
-            >
-              <ExternalLink size={11} />
-              JIRA
-            </a>
+            {externalIssueLink?.url ? (
+              <a
+                href={externalIssueLink.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <ExternalLink size={11} />
+                {externalIssueLink.label}
+              </a>
+            ) : (
+              <a
+                href="#"
+                onClick={e => e.preventDefault()}
+                className="inline-flex items-center gap-1 text-xs"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <ExternalLink size={11} />
+                JIRA
+              </a>
+            )}
             {onNewConversation && (
               <button
                 onClick={() => { onNewConversation(); setShowHistory(false) }}

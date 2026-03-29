@@ -238,7 +238,7 @@ import mlflow
 # Enable auto-tracing for specific frameworks
 mlflow.openai.autolog()        # OpenAI SDK calls
 mlflow.langchain.autolog()     # LangChain chains and agents
-# Also available: mlflow.anthropic.autolog(), mlflow.litellm.autolog(), etc.
+# Also available: mlflow.anthropic.autolog(), etc.
 
 # Set tracking and destination
 mlflow.set_tracking_uri("databricks")
@@ -261,7 +261,7 @@ response = client.chat.completions.create(
 **20+ supported frameworks** including:
 - OpenAI, Anthropic, Google GenAI
 - LangChain, LlamaIndex, DSPy
-- LiteLLM, Ollama, Bedrock
+- Ollama, Bedrock
 - CrewAI, AutoGen, Haystack
 
 ---

@@ -21,7 +21,7 @@ Before recommending tutorials or integration steps, determine which use case the
 Search the user's project for imports and usage patterns that indicate the use case:
 
 **GenAI indicators** (any of these suggest GenAI):
-- Imports from LLM client libraries: `openai`, `anthropic`, `google.generativeai`, `langchain`, `langchain_openai`, `langgraph`, `llamaindex`, `litellm`, `autogen`, `crewai`, `dspy`
+- Imports from LLM client libraries: `openai`, `anthropic`, `google.generativeai`, `langchain`, `langchain_openai`, `langgraph`, `llamaindex`, `autogen`, `crewai`, `dspy`
 - Imports from MLflow GenAI modules: `mlflow.genai`, `mlflow.tracing`, `mlflow.openai`, `mlflow.langchain`
 - Usage of chat completions, embeddings, or agent frameworks
 - Prompt templates or prompt engineering code
@@ -34,7 +34,7 @@ Search the user's project for imports and usage patterns that indicate the use c
 
 ```bash
 # Search for GenAI indicators
-grep -rl --include='*.py' -E '(import openai|import anthropic|from langchain|from langgraph|import litellm|from mlflow\.genai|from mlflow\.tracing|mlflow\.openai|mlflow\.langchain|ChatCompletion|chat\.completions)' .
+grep -rl --include='*.py' -E '(import openai|import anthropic|from langchain|from langgraph|from mlflow\.genai|from mlflow\.tracing|mlflow\.openai|mlflow\.langchain|ChatCompletion|chat\.completions)' .
 
 # Search for ML indicators
 grep -rl --include='*.py' -E '(from sklearn|import torch|import tensorflow|import keras|import xgboost|import lightgbm|mlflow\.sklearn|mlflow\.pytorch|mlflow\.tensorflow|\.fit\()' .
@@ -137,7 +137,6 @@ mock_chat("What is MLflow?")
    mlflow.openai.autolog()       # OpenAI SDK
    mlflow.anthropic.autolog()    # Anthropic SDK
    mlflow.langchain.autolog()    # LangChain / LangGraph
-   mlflow.litellm.autolog()      # LiteLLM
    ```
 
    Add this call once at application startup (e.g., top of `main.py`, `app.py`, or the entry point module). It must execute before any LLM calls are made.

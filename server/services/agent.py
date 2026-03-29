@@ -257,16 +257,29 @@ def _is_incident_key(story_key: str) -> bool:
     return bool(re.match(r'^INC\d+$', str(story_key), re.IGNORECASE))
 
 
+def _is_github_issue_key(story_key: str) -> bool:
+    """gh:owner/repo#issue_number"""
+    import re
+    return bool(re.match(r'^gh:[^/]+/[^#]+#\d+$', str(story_key)))
+
+
 async def _run_async(story, messages, session_id, conversation_id, put_event, mode='agent'):
     from claude_agent_sdk import ClaudeAgentOptions, query
-    from .system_prompt import build_story_system_prompt, build_planning_system_prompt, build_incident_system_prompt
+    from .system_prompt import (
+        build_story_system_prompt,
+        build_planning_system_prompt,
+        build_incident_system_prompt,
+        build_github_issue_system_prompt,
+        build_github_planning_system_prompt,
+    )
 
     # Read credentials fresh at call time (not from stale module-level globals)
     host = os.getenv("DATABRICKS_HOST", "") or DATABRICKS_HOST
     token = os.getenv("DATABRICKS_TOKEN", "") or DATABRICKS_TOKEN
     story_key = story.get("key", "") if isinstance(story, dict) else ""
     is_incident = _is_incident_key(story_key)
-    logger.info(f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, mode={mode}, is_incident={is_incident}")
+    is_github = _is_github_issue_key(story_key)
+    logger.info(f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, mode={mode}, is_incident={is_incident}, is_github={is_github}")
     try:
         from databricks_tools_core.auth import set_databricks_auth
         set_databricks_auth(host, token)
@@ -274,11 +287,19 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
         pass
 
     if mode == 'plan':
-        system_prompt = build_planning_system_prompt(story)
+        if is_github:
+            system_prompt = build_github_planning_system_prompt(story)
+        else:
+            system_prompt = build_planning_system_prompt(story)
         allowed_tools = BUILTIN_TOOLS
         mcp_servers = {}
     elif is_incident:
         system_prompt = build_incident_system_prompt()
+        mcp_server, tool_names = _load_databricks_tools()
+        allowed_tools = BUILTIN_TOOLS + tool_names
+        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
+    elif is_github:
+        system_prompt = build_github_issue_system_prompt(story)
         mcp_server, tool_names = _load_databricks_tools()
         allowed_tools = BUILTIN_TOOLS + tool_names
         mcp_servers = {"databricks": mcp_server} if mcp_server else {}

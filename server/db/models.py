@@ -21,7 +21,7 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
-    story_key: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    story_key: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     story_json: Mapped[str] = mapped_column(Text, nullable=False)  # JSON snapshot of story
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="idle")  # idle|building|done
     session_id: Mapped[str | None] = mapped_column(Text, nullable=True)  # claude-agent-sdk session
@@ -85,7 +85,7 @@ class Asset(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_new_id)
     conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id"), nullable=False)
-    story_key: Mapped[str] = mapped_column(String(50), nullable=False)
+    story_key: Mapped[str] = mapped_column(String(200), nullable=False)
     # asset_type: pipeline|table|dashboard|endpoint|job|schema|notebook
     asset_type: Mapped[str] = mapped_column(String(30), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)

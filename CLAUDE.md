@@ -9,7 +9,7 @@ using a Claude Code agent with Databricks MCP tools.
 - **Backend**: FastAPI (Python), served via Databricks Apps compute
 - **AI**: Anthropic Claude via claude-agent-sdk, streamed over SSE to the browser
 - **Storage**: Lakebase PostgreSQL (`scrum-demo-db` instance, `databricks_postgres` DB) — conversations, messages, assets; set `USE_SQLITE=1` for local dev without Databricks credentials
-- **Deployed to**: Databricks Apps — app name `rxscrum-agent`, profile `builder-demo`
+- **Deployed to**: Databricks Apps — app name `rxscrum-agent`, profile `builder-demo` (`deploy.sh`). `~/.databrickscfg` profiles like `customer-demo` / `builder-demo` may name the same workspace — use either for local CLI/SDK.
 
 ## Directory Structure
 
@@ -51,6 +51,8 @@ using a Claude Code agent with Databricks MCP tools.
 
 ## Local Development
 
+Credentials: `~/.databrickscfg`. The FastAPI agent expects **`DATABRICKS_HOST`** and **`DATABRICKS_TOKEN`** in the environment for Databricks MCP; export from your profile or a gitignored `.env`.
+
 ```bash
 # Terminal 1 — Backend
 cd server
@@ -64,6 +66,17 @@ npm run dev
 # Vite proxies /api/* → localhost:8000
 ```
 
+## Committed `client/dist` (customers without npm)
+
+The production **`client/dist`** bundle is **checked in** on purpose so people who **cannot install or run Node/npm** (e.g. locked-down customer laptops) can still clone the repo and run the app with **Python only** — FastAPI serves the pre-built SPA from `client/dist`.
+
+**Implications for anyone who edits `client/src`:**
+
+1. **You must run `npm run build`** in `client/` after UI changes. That regenerates hashed assets under `client/dist/` and updates `client/dist/index.html`. Commit those files so customers and deployments get the new UI.
+2. **`./deploy.sh` does not always run a build** — if `client/dist` already exists, the script **skips** `npm run build`. So before deploying, either run **`npm run build` manually** (recommended) or remove `client/dist` first if you want the script to build for you.
+
+Without a fresh build after code changes, **`client/dist` is stale** and the deployed app will show old UI.
+
 ## Deployment
 
 ```bash
@@ -71,7 +84,7 @@ npm run dev
 ```
 
 This script:
-1. Builds the React frontend (`npm run build`)
+1. Runs `npm run build` in `client/` **only if `client/dist` is missing**; otherwise it reuses the existing bundle (see above).
 2. Stages clean files to `/tmp/rxscrum-stage` (no `.venv`, `node_modules`, `*.db`, `agent_work`)
 3. Uploads to Databricks workspace via `workspace import-dir`
 4. Runs `apps deploy rxscrum-agent`

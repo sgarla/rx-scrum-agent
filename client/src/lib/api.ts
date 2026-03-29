@@ -1,4 +1,4 @@
-import type { Asset, AssetSession, Conversation, JiraStory, ServiceNowIncident, ServiceNowSettings, StoredMessage, StoryFilters } from './types'
+import type { Asset, AssetSession, Conversation, JiraStory, ServiceNowIncident, ServiceNowSettings, StoredMessage, StoryFilters, GitHubIssue, AppSettings } from './types'
 
 const BASE = '/api'
 
@@ -122,14 +122,41 @@ export async function reparseStoryAssets(story_key: string): Promise<{ assets: A
 }
 
 // Settings
-export async function fetchSettings(): Promise<ServiceNowSettings> {
-  return request<ServiceNowSettings>('/settings')
+export async function fetchSettings(): Promise<AppSettings> {
+  return request<AppSettings>('/settings')
 }
 
 export async function updateSettings(settings: Record<string, string>): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/settings', {
     method: 'PUT',
     body: JSON.stringify(settings),
+  })
+}
+
+
+// GitHub Issues
+export async function fetchGitHubIssues(opts: {
+  state?: string
+  search?: string
+  limit?: number
+  page?: number
+} = {}): Promise<{ issues: GitHubIssue[]; total: number; configured: boolean; error: string | null }> {
+  const params = new URLSearchParams()
+  if (opts.state) params.set('state', opts.state)
+  if (opts.search) params.set('search', opts.search)
+  if (opts.limit != null) params.set('limit', String(opts.limit))
+  if (opts.page != null) params.set('page', String(opts.page))
+  const qs = params.toString()
+  return request(`/github/issues${qs ? '?' + qs : ''}`)
+}
+
+export async function testGitHubConnection(
+  github_token: string,
+  github_repo: string,
+): Promise<{ ok: boolean; error: string | null; full_name?: string }> {
+  return request('/settings/test-github', {
+    method: 'POST',
+    body: JSON.stringify({ github_token, github_repo }),
   })
 }
 
