@@ -21,6 +21,9 @@ agent_work/
 # macOS
 .DS_Store
 
+# Demo repos (cloned separately, not part of this project)
+demo/
+
 # Secrets / local overrides
 .env
 app.yaml.local
