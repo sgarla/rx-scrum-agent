@@ -85,8 +85,12 @@ async def test_snow_connection(payload: dict, db: Session = Depends(get_db)):
 @router.post("/settings/test-github")
 async def test_github_conn(payload: dict, db: Session = Depends(get_db)):
     """Test GitHub token + repo."""
-    from ..db import Setting as SettingModel
-    stored = {r.key: r.value for r in db.query(SettingModel).filter(SettingModel.key.in_(_GITHUB_KEYS)).all()}
-    token = payload.get("github_token") or stored.get("github_token", "")
-    repo = payload.get("github_repo") or stored.get("github_repo", "")
-    return test_github_connection(token, repo)
+    try:
+        from ..db import Setting as SettingModel
+        stored = {r.key: r.value for r in db.query(SettingModel).filter(SettingModel.key.in_(_GITHUB_KEYS)).all()}
+        token = payload.get("github_token") or stored.get("github_token", "")
+        repo = payload.get("github_repo") or stored.get("github_repo", "")
+        return test_github_connection(token, repo)
+    except Exception as e:
+        logger.exception("test-github endpoint failed: %s", e)
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}

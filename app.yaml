@@ -27,6 +27,12 @@ env:
     value: "scrum-demo-db"
   - name: LAKEBASE_DATABASE_NAME
     value: "databricks_postgres"
+  - name: LAKEBASE_HOST
+    value: "ep-flat-base-d2vm1kmu.database.us-east-1.cloud.databricks.com"
+  - name: LAKEBASE_PG_USER
+    value: "scrumapp"
+  - name: LAKEBASE_PG_PASSWORD
+    value: "scrumapp2026!"
   - name: SKILLS_DIR
     value: "./skills"
   - name: CLAUDE_CODE_STREAM_CLOSE_TIMEOUT

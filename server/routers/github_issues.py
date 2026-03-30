@@ -21,8 +21,11 @@ async def fetch_github_issues(
     page: int = Query(1, ge=1),
     db: Session = Depends(get_db),
 ):
-    result = list_issues(db, state=state, search=search, limit=limit, page=page)
-    return result
+    try:
+        return list_issues(db, state=state, search=search, limit=limit, page=page)
+    except Exception as e:
+        logger.exception("fetch_github_issues failed: %s", e)
+        return {"issues": [], "total": 0, "configured": False, "error": f"{type(e).__name__}: {e}"}
 
 
 @router.get("/github/issues/by-key/{story_key:path}")

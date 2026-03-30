@@ -44,9 +44,9 @@ def test_github_connection(token: str, repo: str) -> dict[str, Any]:
             repo_r.raise_for_status()
             data = repo_r.json()
             return {"ok": True, "error": None, "full_name": data.get("full_name", f"{owner}/{name}")}
-    except httpx.HTTPError as e:
-        logger.warning("GitHub test error: %s", e)
-        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        logger.warning("GitHub test error: %s: %s", type(e).__name__, e)
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 def _normalize_issue(raw: dict, owner: str, repo_name: str) -> dict:
     num = raw.get("number") or 0
     key = f"gh:{owner}/{repo_name}#{num}"
@@ -80,9 +80,9 @@ def list_issues(db, *, state: str = "open", search: str = "", limit: int = 50, p
                         continue
                     out.append(_normalize_issue(item, owner, repo_name))
                 return {"issues": out, "total": data.get("total_count", len(out)), "configured": True, "error": None}
-        except httpx.HTTPError as e:
-            logger.exception("GitHub search failed")
-            return {"issues": [], "total": 0, "configured": True, "error": str(e)}
+        except Exception as e:
+            logger.exception("GitHub search failed: %s: %s", type(e).__name__, e)
+            return {"issues": [], "total": 0, "configured": True, "error": f"{type(e).__name__}: {e}"}
     try:
         with httpx.Client(timeout=30.0) as client:
             r = client.get(f"{GITHUB_API}/repos/{owner}/{repo_name}/issues", headers=headers, params=params)
@@ -92,9 +92,9 @@ def list_issues(db, *, state: str = "open", search: str = "", limit: int = 50, p
                 return {"issues": [], "total": 0, "configured": True, "error": f"Repository not found: {owner}/{repo_name}"}
             r.raise_for_status()
             raw_list = r.json()
-    except httpx.HTTPError as e:
-        logger.exception("GitHub list issues failed")
-        return {"issues": [], "total": 0, "configured": True, "error": str(e)}
+    except Exception as e:
+        logger.exception("GitHub list issues failed: %s: %s", type(e).__name__, e)
+        return {"issues": [], "total": 0, "configured": True, "error": f"{type(e).__name__}: {e}"}
     out = []
     for raw in raw_list:
         if raw.get("pull_request"):

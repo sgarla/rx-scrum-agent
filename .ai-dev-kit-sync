@@ -1,0 +1,4 @@
+# ai-dev-kit sync tracking
+# This file records the last ai-dev-kit commit that skills/ was synced from.
+# Used by scripts/check-ai-dev-kit-updates.sh to detect upstream changes.
+LAST_SYNCED_COMMIT=28b54ee38d0138e5ea26fc60cf49e0cba05b9675

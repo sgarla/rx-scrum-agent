@@ -40,7 +40,7 @@ for i in {1..20}; do
   state=$(databricks --profile "$PROFILE" apps get "$APP_NAME" 2>&1 | grep '"state"' | sed -n '1p' | tr -d ' ",:' | sed 's/state//')
   echo "$(date +%H:%M:%S) $state"
   if [[ "$state" == "SUCCEEDED" ]]; then
-    echo "✓ Deployed: https://${APP_NAME}-7474647717666058.aws.databricksapps.com"
+    echo "✓ Deployed: https://${APP_NAME}-7474647211870044.aws.databricksapps.com"
     exit 0
   elif [[ "$state" == "FAILED" ]]; then
     databricks --profile "$PROFILE" apps get "$APP_NAME" 2>&1 | grep '"message"' | head -3

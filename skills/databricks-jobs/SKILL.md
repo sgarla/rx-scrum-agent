@@ -311,6 +311,79 @@ resources:
 - `CAN_MANAGE_RUN` - View, trigger, and cancel runs
 - `CAN_MANAGE` - Full control including edit and delete
 
+## Monitoring a Job Run
+
+**Always use `action='wait'` to monitor job completion — never poll with `action='get'`.**
+
+`action='get'` returns a point-in-time snapshot. A run that is `RUNNING` or `WAITING_FOR_RETRY` is not complete. Only `action='wait'` blocks until a terminal state is reached and returns an accurate final result.
+
+```python
+# Trigger a run, then wait for it to finish
+result = manage_job_runs(action="run_now", job_id=12345)
+run_id = result["run_id"]
+
+# Wait for completion - returns success/failure with full details
+outcome = manage_job_runs(action="wait", run_id=run_id)
+# outcome["success"] is True only when result_state == SUCCESS
+# outcome["lifecycle_state"] and outcome["result_state"] describe the final state
+```
+
+**Terminal states** (run is finished): `TERMINATED`, `SKIPPED`, `INTERNAL_ERROR`
+
+**Non-terminal states** (run is still active — do not report as complete):
+- `RUNNING` — tasks are executing
+- `WAITING_FOR_RETRY` — a task failed and is waiting to retry (see `max_retries` in task config)
+- `BLOCKED` — waiting on upstream task dependency
+- `PENDING` / `QUEUED` — waiting to start
+
+## Repairing a Failed Run
+
+> **Note:** `repair_run` is not yet implemented in the MCP tools. Until it is, use `run_now` as a workaround and note the limitation to the user.
+
+A repair run re-executes only the failed/skipped tasks from a previous run, preserving successful task results. It is more efficient than a full re-run.
+
+**Python SDK (direct):**
+```python
+from databricks.sdk import WorkspaceClient
+from databricks.sdk.service.jobs import RepairHistoryItem
+
+w = WorkspaceClient()
+
+# Repair all failed/skipped tasks in a run
+repair = w.jobs.repair_run(
+    run_id=67890,           # The failed run_id (not job_id)
+    rerun_all_failed_tasks=True
+)
+print(f"Repair run ID: {repair.repair_id}")
+
+# Repair a specific task by name — use when the user identifies a particular task
+repair = w.jobs.repair_run(
+    run_id=67890,
+    rerun_tasks=["transform"]   # task_key(s) to re-run; other tasks are not touched
+)
+```
+
+**CLI:**
+```bash
+# Repair all failed tasks
+databricks jobs repair-run --run-id 67890 --rerun-all-failed-tasks
+
+# Repair a specific task
+databricks jobs repair-run --run-id 67890 --rerun-tasks '["transform"]'
+```
+
+**Which repair mode to use:**
+
+| User intent | Parameter to use |
+|-------------|-----------------|
+| "repair the failed run" / "retry failed tasks" | `rerun_all_failed_tasks=True` |
+| "repair the `<task_name>` task" / "re-run only `<task_name>`" | `rerun_tasks=["<task_name>"]` |
+| "re-run tasks X and Y" | `rerun_tasks=["X", "Y"]` |
+
+**When to repair vs re-run:**
+- Repair: task failure due to transient error (network, timeout, flaky dependency) — reuse successful task outputs
+- Full re-run: job config changed, data needs to be reprocessed from scratch
+
 ## Common Issues
 
 | Issue | Solution |
@@ -323,6 +396,8 @@ resources:
 | Parameter not accessible | Use `dbutils.widgets.get()` in notebooks |
 | "admins" group error | Cannot modify admins permissions on jobs |
 | Serverless task fails | Ensure task type supports serverless (notebook, Python) |
+| Run still active but reported as complete | Use `action='wait'` not `action='get'`; `WAITING_FOR_RETRY` means run is still active |
+| Repair run triggers full run | `repair_run` not yet in MCP tools; use SDK/CLI `repair-run` directly |
 
 ## Related Skills
 

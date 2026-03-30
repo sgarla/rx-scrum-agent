@@ -54,7 +54,18 @@ def _get_lakebase_host() -> str:
 
 
 def _get_db_token() -> str:
-    """Get a fresh OAuth token for Lakebase, caching with 2-minute early refresh."""
+    """Get password/token for Lakebase.
+
+    Priority:
+    1. LAKEBASE_PG_PASSWORD — native PG password (set in app.yaml)
+    2. PGPASSWORD — set by Databricks Apps runtime for database resources
+    3. SDK generate_database_credential — OAuth token refresh
+    """
+    for env_key in ("LAKEBASE_PG_PASSWORD", "PGPASSWORD"):
+        val = os.getenv(env_key, "")
+        if val:
+            return val
+
     now = time.time()
     with _token_lock:
         if _token_cache["token"] and now < _token_cache["expires_at"] - 120:
@@ -76,10 +87,14 @@ def _get_db_token() -> str:
 
 
 def _get_pg_user() -> str:
-    """Get PostgreSQL username: PGUSER from Apps runtime, or current user from SDK."""
-    user = os.getenv("PGUSER", "")
-    if user:
-        return user
+    """Get PostgreSQL username.
+
+    Priority: LAKEBASE_PG_USER > PGUSER (Apps runtime) > SDK current user.
+    """
+    for env_key in ("LAKEBASE_PG_USER", "PGUSER"):
+        val = os.getenv(env_key, "")
+        if val:
+            return val
     try:
         from databricks.sdk import WorkspaceClient
         w = WorkspaceClient()
@@ -91,23 +106,24 @@ def _get_pg_user() -> str:
 
 
 def _create_pg_connection():
-    """Factory: create a psycopg2 connection with a fresh OAuth token."""
+    """Factory: create a psycopg2 connection with native PG or OAuth credentials."""
     import psycopg2
     host = _get_lakebase_host()
-    token = _get_db_token()
+    password = _get_db_token()
     user = _get_pg_user()
     if not user:
         raise RuntimeError(
-            "Cannot determine PostgreSQL username. Set PGUSER env var or ensure "
-            "Databricks SDK can resolve the current user."
+            "Cannot determine PostgreSQL username. Set LAKEBASE_PG_USER or PGUSER env var."
         )
-    logger.debug(f"Connecting to Lakebase as user: {user}")
+    logger.info(
+        f"Connecting to Lakebase: host={host} user={user} db={LAKEBASE_DATABASE_NAME}"
+    )
     return psycopg2.connect(
         host=host,
         port=LAKEBASE_PORT,
         dbname=LAKEBASE_DATABASE_NAME,
         user=user,
-        password=token,
+        password=password,
         sslmode="require",
         connect_timeout=15,
     )

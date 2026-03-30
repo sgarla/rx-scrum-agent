@@ -17,6 +17,9 @@ using a Claude Code agent with Databricks MCP tools.
 ├── app.yaml              # Databricks Apps runtime config (env vars)
 ├── requirements.txt      # Python dependencies
 ├── deploy.sh             # Build + stage + deploy script (DO NOT use databricks sync)
+├── .ai-dev-kit-sync      # Tracks last-synced ai-dev-kit commit for skills
+├── scripts/
+│   └── check-ai-dev-kit-updates.sh  # Check / sync upstream ai-dev-kit changes
 ├── client/               # React frontend (Vite)
 │   └── src/
 │       ├── App.tsx
@@ -99,6 +102,48 @@ Always deploy via `workspace import-dir` from the clean staging directory.
 - **SSE streaming**: `stream_manager.py` maps live `execution_id → asyncio.Queue`. `fetchConversationStatus()` returns `execution_id` only when an execution is live — use this to reconnect SSE on page reload.
 - **Conversation loading**: `conversationLoading` boolean covers the 3-call chain: `fetchConversationsByStory` → `fetchConversationFull` → `fetchConversationStatus`. Show spinner until all three complete.
 - **Chat timestamps**: Compare `msg.timestamp.toDateString()` vs prev message to show date separator pills ("Today", "Yesterday", or formatted date). Show per-message times via the `showTime` prop on `AgentMessage`.
+
+## Syncing ai-dev-kit Updates
+
+This project is built on top of the [ai-dev-kit](https://github.com/databricks-solutions/ai-dev-kit) Visual Builder App. We track upstream changes to **Databricks capabilities only** — skills, MCP tools, and core packages. The frontend and app-level backend code are scrum-demo-owned and not synced.
+
+**What we track:**
+
+| Component | Source in ai-dev-kit | Local / Install |
+|-----------|---------------------|-----------------|
+| Skills | `databricks-skills/` | `skills/` (copied) |
+| MCP server | `databricks-mcp-server/` | PyPI: `databricks-mcp-server` |
+| Core tools | `databricks-tools-core/` | PyPI: `databricks-tools-core` |
+| Claude SDK | — | PyPI: `claude-agent-sdk` |
+
+**Check for updates:**
+
+```bash
+./scripts/check-ai-dev-kit-updates.sh
+```
+
+Shows skill file changes since last sync, outdated package versions, and MCP tool changes. No modifications — read-only.
+
+**Sync skills from upstream:**
+
+```bash
+./scripts/check-ai-dev-kit-updates.sh --sync
+# Review changes, then:
+git add skills/ .ai-dev-kit-sync && git commit -m "chore: sync skills from ai-dev-kit"
+```
+
+This copies updated skill files from `ai-dev-kit/main:databricks-skills/` into `skills/`, preserving any local-only skills (e.g. `agent-evaluation`, `mlflow-onboarding`). The sync point is recorded in `.ai-dev-kit-sync`.
+
+**Update packages:**
+
+```bash
+# Check current vs latest
+pip index versions claude-agent-sdk databricks-mcp-server
+# Edit requirements.txt, then:
+pip install -r requirements.txt
+```
+
+**Remote:** The `ai-dev-kit` git remote is configured to track `https://github.com/databricks-solutions/ai-dev-kit.git`. If missing, the check script adds it automatically.
 
 ## In-Progress Features
 
