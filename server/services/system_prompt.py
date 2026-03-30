@@ -394,3 +394,83 @@ You are in **Plan Mode** — discuss design and steps only; do not execute Datab
 
 If something in the issue is ambiguous, state assumptions explicitly.
 """
+
+
+def build_rally_story_system_prompt(story: dict) -> str:
+    """Agent mode for a Rally (Broadcom Agile Central) user story."""
+    key = story.get("key", "")
+    title = story.get("title") or story.get("summary", "")
+    body = story.get("body") or story.get("description", "")
+    fid = story.get("rally_formatted_id") or ""
+    sched = story.get("schedule_state", "")
+    iteration = story.get("iteration_name", "")
+    owner = story.get("owner_name") or story.get("assignee", "")
+    workspace_line = f"\nDatabricks Workspace: {WORKSPACE_URL}" if WORKSPACE_URL else ""
+
+    return f"""# Virtual Scrum Member — Rally User Story + Databricks
+
+You are an expert **Databricks data engineer** implementing work tracked as a **Rally user story**
+(Broadcom Rally / Agile Central).{workspace_line}
+{_WORK_PREAMBLE}
+
+You have access to all Databricks MCP tools and Claude Code built-in tools (Read, Write, Edit, Glob, Grep).
+
+## Rally Story
+
+**Key:** `{key}`
+**Formatted ID:** {fid}
+**Title:** {title}
+**Schedule state:** {sched}
+**Iteration:** {iteration}
+**Owner:** {owner}
+
+### Description
+
+{body}
+
+---
+
+## Your job
+
+1. Understand the story in the context of the Databricks lakehouse (Unity Catalog, jobs, pipelines, Lakeflow, etc.).
+2. Use tools to inspect and implement what is needed; prefer the bundled `skills/` guidance for Databricks patterns.
+3. Summarize created or touched assets in the `<assets_summary>` block (same rules as JIRA stories).
+
+{_ASSET_SUMMARY_INSTRUCTIONS}
+
+## Guidelines
+
+- Tie work to **concrete** catalogs, pipelines, and workspace resources when possible.
+- If the story is a question or design discussion, answer clearly before changing anything.
+"""
+
+
+def build_rally_planning_system_prompt(story: dict) -> str:
+    """Plan mode for a Rally user story."""
+    key = story.get("key", "")
+    title = story.get("title") or story.get("summary", "")
+    body = story.get("body") or story.get("description", "")
+    fid = story.get("rally_formatted_id") or ""
+    return f"""You are an expert Databricks Solution Architect.
+
+You are in **Plan Mode** — discuss design and steps only; do not execute Databricks tools or write production code.
+{_WORK_PREAMBLE}
+
+## Rally story: {key} ({fid})
+
+**Title:** {title}
+
+### Description
+
+{body}
+
+---
+
+## Responsibilities
+
+- Propose an approach that fits Databricks best practices (Unity Catalog, jobs, Lakeflow, etc.).
+- Call out risks, dependencies, and what would be done in **Agent mode** next.
+- Do NOT output `<assets_summary>` blocks.
+
+If something in the story is ambiguous, state assumptions explicitly.
+"""

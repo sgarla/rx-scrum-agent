@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Toaster, toast } from 'sonner'
-import { AlertTriangle, Github, LayoutDashboard, Sparkles } from 'lucide-react'
+import { AlertTriangle, Github, KanbanSquare, LayoutDashboard, Sparkles } from 'lucide-react'
 import { AssetsPanel } from './components/AssetsPanel/AssetsPanel'
 import { ChatPanel } from './components/ChatPanel/ChatPanel'
 import { GeniePanel } from './components/GeniePanel/GeniePanel'
@@ -8,18 +8,21 @@ import { Header } from './components/layout/Header'
 import { IncidentChatPanel } from './components/IncidentPanel/IncidentChatPanel'
 import { IncidentPanel } from './components/IncidentPanel/IncidentPanel'
 import { IssuePanel } from './components/GitHubIssuePanel/IssuePanel'
+import { RallyPanel } from './components/RallyPanel/RallyPanel'
 import { SettingsModal } from './components/Settings/SettingsModal'
 import { StoryPanel } from './components/StoryPanel/StoryPanel'
 import { useAssets } from './hooks/useAssets'
 import { useConversation } from './hooks/useConversation'
 import { useGitHubIssues } from './hooks/useGitHubIssues'
+import { useRallyStories } from './hooks/useRallyStories'
 import { useIncidents } from './hooks/useIncidents'
 import { useStories } from './hooks/useStories'
 import { fetchHealth, fetchSettings, reparseStoryAssets, updateStoryStatus } from './lib/api'
 import { githubIssueAsJiraStory } from './lib/github'
+import { rallyStoryAsJiraStory } from './lib/rally'
 import type { JiraStory, ServiceNowIncident } from './lib/types'
 
-type AppTab = 'board' | 'issues' | 'incidents' | 'genie'
+type AppTab = 'board' | 'rally' | 'issues' | 'incidents' | 'genie'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('board')
@@ -28,6 +31,7 @@ export default function App() {
   const [activeStory, setActiveStory] = useState<JiraStory | null>(null)
 
   const [activeIssueKey, setActiveIssueKey] = useState<string | null>(null)
+  const [activeRallyKey, setActiveRallyKey] = useState<string | null>(null)
 
   const [activeIncidentNumber, setActiveIncidentNumber] = useState<string | null>(null)
   const [activeIncident, setActiveIncident] = useState<ServiceNowIncident | null>(null)
@@ -41,12 +45,19 @@ export default function App() {
   const { messages: storyMessages, isBuilding: storyBuilding, conversationLoading: storyConvLoading, conversation: storyConv, conversations: storyConversations, sendMessage: storySend, stop: storyStop, error: storyError, createNewConversation: storyNewConv, switchConversation: storySwitchConv, renameConversation: storyRenameConv } = useConversation(activeStoryKey)
   const { sessions, loading: assetsLoading, reload: reloadAssets } = useAssets(storyConv?.id ?? null, activeStoryKey, storyBuilding)
 
+  const { stories: rallyStories, loading: rallyLoading, configured: rallyConfigured, error: rallyError, filters: rallyFilters, updateFilter: updateRallyFilter, reload: reloadRallyStories } = useRallyStories()
   const { issues: ghIssues, loading: ghLoading, configured: ghConfigured, error: ghError, filters: ghFilters, updateFilter: updateGhFilter, reload: reloadGhIssues } = useGitHubIssues()
   const { messages: ghMessages, isBuilding: ghBuilding, conversationLoading: ghConvLoading, conversation: ghConv, conversations: ghConversations, sendMessage: ghSend, stop: ghStop, error: ghErr, createNewConversation: ghNewConv, switchConversation: ghSwitchConv, renameConversation: ghRenameConv } = useConversation(activeIssueKey)
   const { sessions: ghSessions, loading: ghAssetsLoading, reload: reloadGhAssets } = useAssets(ghConv?.id ?? null, activeIssueKey, ghBuilding)
 
+  const { messages: rallyMessages, isBuilding: rallyBuilding, conversationLoading: rallyConvLoading, conversation: rallyConv, conversations: rallyConversations, sendMessage: rallySend, stop: rallyStop, error: rallyErr, createNewConversation: rallyNewConv, switchConversation: rallySwitchConv, renameConversation: rallyRenameConv } = useConversation(activeRallyKey)
+  const { sessions: rallySessions, loading: rallyAssetsLoading, reload: reloadRallyAssets } = useAssets(rallyConv?.id ?? null, activeRallyKey, rallyBuilding)
+
   const activeGhIssue = ghIssues.find(i => i.key === activeIssueKey) ?? null
   const ghStoryView: JiraStory | null = activeGhIssue ? githubIssueAsJiraStory(activeGhIssue) : null
+
+  const activeRallyStory = rallyStories.find(s => s.key === activeRallyKey) ?? null
+  const rallyStoryView: JiraStory | null = activeRallyStory ? rallyStoryAsJiraStory(activeRallyStory) : null
 
   const { incidents, loading: incLoading, configured: incConfigured, error: incError, filters: incFilters, updateFilter: updateIncFilter, reload: reloadIncidents } = useIncidents()
   const { messages: incMessages, isBuilding: incBuilding, conversationLoading: incConvLoading, conversation: incConv, startBuild: incStartBuild, sendMessage: incSend, stop: incStop, error: incError2 } = useConversation(activeIncidentNumber)
@@ -76,6 +87,7 @@ export default function App() {
   useEffect(() => { if (storyError) toast.error(storyError) }, [storyError])
   useEffect(() => { if (incError2) toast.error(incError2) }, [incError2])
   useEffect(() => { if (ghErr) toast.error(ghErr) }, [ghErr])
+  useEffect(() => { if (rallyErr) toast.error(rallyErr) }, [rallyErr])
 
   const handleStorySelect = (key: string) => {
     setActiveStoryKey(key)
@@ -85,6 +97,11 @@ export default function App() {
   const handleIssueSelect = (key: string) => {
     setActiveIssueKey(key)
     setActiveTab('issues')
+  }
+
+  const handleRallySelect = (key: string) => {
+    setActiveRallyKey(key)
+    setActiveTab('rally')
   }
 
   const handleStatusToggle = async (key: string) => {
@@ -111,6 +128,13 @@ export default function App() {
       try { await reparseStoryAssets(activeIssueKey) } catch {}
     }
     reloadGhAssets()
+  }
+
+  const handleRefreshRallyAssets = async () => {
+    if (activeRallyKey && rallySessions.length === 0) {
+      try { await reparseStoryAssets(activeRallyKey) } catch {}
+    }
+    reloadRallyAssets()
   }
 
   const handleIncidentSelect = (number: string) => {
@@ -149,13 +173,30 @@ Please investigate this incident by:
   const handleSettingsSaved = () => {
     reloadIncidents()
     reloadGhIssues()
+    reloadRallyStories()
     fetchSettings().then(s => setSnowInstance(s.snow_instance || undefined)).catch(() => {})
   }
 
-  const tabActive = (tab: AppTab) => ({
-    background: activeTab === tab ? (tab === 'board' ? 'var(--color-accent)' : 'rgba(99,102,241,0.2)') : 'transparent',
-    color: activeTab === tab ? (tab === 'board' ? 'white' : '#818CF8') : 'var(--color-text-secondary)',
-  })
+  const tabActive = (tab: AppTab) => {
+    if (tab === 'board') {
+      return {
+        background: activeTab === tab ? 'var(--color-accent)' : 'transparent',
+        color: activeTab === tab ? 'white' : 'var(--color-text-secondary)',
+      }
+    }
+    if (tab === 'rally') {
+      const active = activeTab === tab
+      return {
+        background: active ? 'rgba(245,158,11,0.2)' : 'transparent',
+        color: active ? '#F59E0B' : 'var(--color-text-secondary)',
+      }
+    }
+    const active = activeTab === tab
+    return {
+      background: active ? 'rgba(99,102,241,0.2)' : 'transparent',
+      color: active ? '#818CF8' : 'var(--color-text-secondary)',
+    }
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -190,6 +231,10 @@ Please investigate this incident by:
         <button type="button" onClick={() => setActiveTab('board')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all" style={tabActive('board')}>
           <LayoutDashboard size={13} />
           Story Board
+        </button>
+        <button type="button" onClick={() => setActiveTab('rally')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all" style={tabActive('rally')}>
+          <KanbanSquare size={13} />
+          Rally
         </button>
         <button type="button" onClick={() => setActiveTab('issues')} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all" style={tabActive('issues')}>
           <Github size={13} />
@@ -238,6 +283,45 @@ Please investigate this incident by:
               isBuilding={storyBuilding}
               workspaceUrl={workspaceUrl}
               onRefresh={handleRefreshAssets}
+            />
+          </>
+        )}
+
+        {activeTab === 'rally' && (
+          <>
+            <RallyPanel
+              stories={rallyStories}
+              loading={rallyLoading}
+              configured={rallyConfigured}
+              error={rallyError}
+              filters={rallyFilters}
+              onFilterChange={updateRallyFilter}
+              activeStoryKey={activeRallyKey}
+              onStorySelect={handleRallySelect}
+              onRefresh={reloadRallyStories}
+              onOpenSettings={() => setSettingsOpen(true)}
+            />
+            <ChatPanel
+              story={rallyStoryView}
+              messages={rallyMessages}
+              isBuilding={rallyBuilding}
+              conversationLoading={rallyConvLoading}
+              error={rallyErr}
+              onSendMessage={(text, mode) => rallySend(text, mode)}
+              onStop={rallyStop}
+              conversations={rallyConversations}
+              activeConversationId={rallyConv?.id ?? null}
+              onNewConversation={rallyNewConv}
+              onSwitchConversation={rallySwitchConv}
+              onRenameConversation={rallyRenameConv}
+            />
+            <AssetsPanel
+              story={rallyStoryView}
+              sessions={rallySessions}
+              loading={rallyAssetsLoading}
+              isBuilding={rallyBuilding}
+              workspaceUrl={workspaceUrl}
+              onRefresh={handleRefreshRallyAssets}
             />
           </>
         )}

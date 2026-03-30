@@ -263,6 +263,12 @@ def _is_github_issue_key(story_key: str) -> bool:
     return bool(re.match(r'^gh:[^/]+/[^#]+#\d+$', str(story_key)))
 
 
+def _is_rally_key(story_key: str) -> bool:
+    from .rally import parse_rally_story_key
+
+    return parse_rally_story_key(story_key) is not None
+
+
 async def _run_async(story, messages, session_id, conversation_id, put_event, mode='agent'):
     from claude_agent_sdk import ClaudeAgentOptions, query
     from .system_prompt import (
@@ -271,6 +277,8 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
         build_incident_system_prompt,
         build_github_issue_system_prompt,
         build_github_planning_system_prompt,
+        build_rally_story_system_prompt,
+        build_rally_planning_system_prompt,
     )
 
     # Read credentials fresh at call time (not from stale module-level globals)
@@ -279,7 +287,11 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
     story_key = story.get("key", "") if isinstance(story, dict) else ""
     is_incident = _is_incident_key(story_key)
     is_github = _is_github_issue_key(story_key)
-    logger.info(f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, mode={mode}, is_incident={is_incident}, is_github={is_github}")
+    is_rally = _is_rally_key(story_key)
+    logger.info(
+        f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, "
+        f"mode={mode}, is_incident={is_incident}, is_github={is_github}, is_rally={is_rally}"
+    )
     try:
         from databricks_tools_core.auth import set_databricks_auth
         set_databricks_auth(host, token)
@@ -289,6 +301,8 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
     if mode == 'plan':
         if is_github:
             system_prompt = build_github_planning_system_prompt(story)
+        elif is_rally:
+            system_prompt = build_rally_planning_system_prompt(story)
         else:
             system_prompt = build_planning_system_prompt(story)
         allowed_tools = BUILTIN_TOOLS
@@ -300,6 +314,11 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
         mcp_servers = {"databricks": mcp_server} if mcp_server else {}
     elif is_github:
         system_prompt = build_github_issue_system_prompt(story)
+        mcp_server, tool_names = _load_databricks_tools()
+        allowed_tools = BUILTIN_TOOLS + tool_names
+        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
+    elif is_rally:
+        system_prompt = build_rally_story_system_prompt(story)
         mcp_server, tool_names = _load_databricks_tools()
         allowed_tools = BUILTIN_TOOLS + tool_names
         mcp_servers = {"databricks": mcp_server} if mcp_server else {}

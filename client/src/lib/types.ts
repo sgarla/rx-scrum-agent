@@ -218,8 +218,33 @@ export interface GitHubIssueFilters {
   search: string
 }
 
+// Rally (Broadcom Agile Central)
+export interface RallyStory {
+  key: string
+  formatted_id: string
+  name: string
+  description: string
+  schedule_state: string
+  iteration_name: string
+  owner_name: string
+  plan_estimate: number
+  priority: 'Critical' | 'High' | 'Medium' | 'Low'
+  tags: string[]
+  rally_url?: string
+}
+
+export interface RallyStoryFilters {
+  state: 'active' | 'completed' | 'all'
+  search: string
+}
+
 export interface AppSettings extends ServiceNowSettings {
   github_repo: string
   github_token_set: boolean
   github_configured: boolean
+  rally_workspace: string
+  rally_project: string
+  rally_iteration: string
+  rally_api_key_set: boolean
+  rally_configured: boolean
 }

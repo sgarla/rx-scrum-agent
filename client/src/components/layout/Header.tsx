@@ -61,9 +61,6 @@ export function Header({
         <DatabricksLogo />
         <div className="flex flex-col leading-none">
           <span className="text-sm font-semibold text-white tracking-tight">DMA-IDW-DEB</span>
-          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            Powered by Databricks
-          </span>
         </div>
       </div>
 

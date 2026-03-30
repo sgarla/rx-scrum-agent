@@ -1,4 +1,16 @@
-import type { Asset, AssetSession, Conversation, JiraStory, ServiceNowIncident, ServiceNowSettings, StoredMessage, StoryFilters, GitHubIssue, AppSettings } from './types'
+import type {
+  Asset,
+  AssetSession,
+  Conversation,
+  JiraStory,
+  ServiceNowIncident,
+  ServiceNowSettings,
+  StoredMessage,
+  StoryFilters,
+  GitHubIssue,
+  RallyStory,
+  AppSettings,
+} from './types'
 
 const BASE = '/api'
 
@@ -157,6 +169,39 @@ export async function testGitHubConnection(
   return request('/settings/test-github', {
     method: 'POST',
     body: JSON.stringify({ github_token, github_repo }),
+  })
+}
+
+// Rally
+export async function fetchRallyStories(opts: {
+  state?: string
+  search?: string
+  limit?: number
+  page?: number
+} = {}): Promise<{ stories: RallyStory[]; total: number; configured: boolean; error: string | null }> {
+  const params = new URLSearchParams()
+  if (opts.state) params.set('state', opts.state)
+  if (opts.search) params.set('search', opts.search)
+  if (opts.limit != null) params.set('limit', String(opts.limit))
+  if (opts.page != null) params.set('page', String(opts.page))
+  const qs = params.toString()
+  return request(`/rally/stories${qs ? '?' + qs : ''}`)
+}
+
+export async function testRallyConnection(
+  rally_api_key: string,
+  rally_workspace: string,
+  rally_project: string,
+  rally_iteration?: string,
+): Promise<{ ok: boolean; error: string | null; workspace_ref?: string; project_ref?: string }> {
+  return request('/settings/test-rally', {
+    method: 'POST',
+    body: JSON.stringify({
+      rally_api_key,
+      rally_workspace,
+      rally_project,
+      rally_iteration: rally_iteration ?? '',
+    }),
   })
 }
 

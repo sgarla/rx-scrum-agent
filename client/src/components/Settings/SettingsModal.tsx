@@ -1,6 +1,6 @@
 import { CheckCircle, Eye, EyeOff, Loader2, Settings, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { fetchSettings, testGitHubConnection, testSnowConnection, updateSettings } from '../../lib/api'
+import { fetchSettings, testGitHubConnection, testRallyConnection, testSnowConnection, updateSettings } from '../../lib/api'
 import type { AppSettings } from '../../lib/types'
 
 interface Props {
@@ -27,6 +27,15 @@ export function SettingsModal({ open, onClose, onSaved }: Props) {
   const [passwordSet, setPasswordSet] = useState(false)
   const [ghTokenSet, setGhTokenSet] = useState(false)
 
+  const [rallyWorkspace, setRallyWorkspace] = useState('')
+  const [rallyProject, setRallyProject] = useState('')
+  const [rallyIteration, setRallyIteration] = useState('')
+  const [rallyApiKey, setRallyApiKey] = useState('')
+  const [showRallyApiKey, setShowRallyApiKey] = useState(false)
+  const [rallyApiKeySet, setRallyApiKeySet] = useState(false)
+  const [testingRally, setTestingRally] = useState(false)
+  const [rallyTestResult, setRallyTestResult] = useState<{ ok: boolean; error: string | null } | null>(null)
+
   useEffect(() => {
     if (!open) return
     fetchSettings()
@@ -39,9 +48,15 @@ export function SettingsModal({ open, onClose, onSaved }: Props) {
         setGhRepo(s.github_repo || '')
         setGhTokenSet(s.github_token_set)
         setGhToken('')
+        setRallyWorkspace(s.rally_workspace || '')
+        setRallyProject(s.rally_project || '')
+        setRallyIteration(s.rally_iteration || '')
+        setRallyApiKeySet(s.rally_api_key_set)
+        setRallyApiKey('')
         setSaved(false)
         setSnowTestResult(null)
         setGhTestResult(null)
+        setRallyTestResult(null)
       })
       .catch(() => {})
   }, [open])
@@ -58,6 +73,24 @@ export function SettingsModal({ open, onClose, onSaved }: Props) {
       setSnowTestResult({ ok: false, error: e instanceof Error ? e.message : 'Unknown error' })
     } finally {
       setTestingSnow(false)
+    }
+  }
+
+  const handleTestRally = async () => {
+    setTestingRally(true)
+    setRallyTestResult(null)
+    try {
+      const result = await testRallyConnection(
+        rallyApiKey,
+        rallyWorkspace,
+        rallyProject,
+        rallyIteration.trim() || undefined,
+      )
+      setRallyTestResult({ ok: result.ok, error: result.error ?? null })
+    } catch (e: unknown) {
+      setRallyTestResult({ ok: false, error: e instanceof Error ? e.message : 'Unknown error' })
+    } finally {
+      setTestingRally(false)
     }
   }
 
@@ -86,12 +119,18 @@ export function SettingsModal({ open, onClose, onSaved }: Props) {
       }
       if (password) payload.snow_password = password
       if (ghToken) payload.github_token = ghToken
+      payload.rally_workspace = rallyWorkspace.trim()
+      payload.rally_project = rallyProject.trim()
+      payload.rally_iteration = rallyIteration.trim()
+      if (rallyApiKey) payload.rally_api_key = rallyApiKey
       await updateSettings(payload)
       setSaved(true)
       setPasswordSet(!!password || passwordSet)
       setGhTokenSet(!!ghToken || ghTokenSet)
+      setRallyApiKeySet(!!rallyApiKey || rallyApiKeySet)
       setPassword('')
       setGhToken('')
+      setRallyApiKey('')
       onSaved()
       setTimeout(() => setSaved(false), 2000)
     } catch (e: unknown) {
@@ -103,7 +142,11 @@ export function SettingsModal({ open, onClose, onSaved }: Props) {
 
   const canSaveSnow = instance.trim() && username.trim()
   const canSaveGh = ghRepo.trim() && (ghToken.trim() || ghTokenSet)
-  const canSave = canSaveSnow || canSaveGh
+  const canSaveRally =
+    rallyWorkspace.trim() &&
+    rallyProject.trim() &&
+    (rallyApiKey.trim() || rallyApiKeySet)
+  const canSave = canSaveSnow || canSaveGh || canSaveRally
 
   return (
     <div
@@ -227,6 +270,81 @@ export function SettingsModal({ open, onClose, onSaved }: Props) {
             >
               {testingGh ? <Loader2 size={13} className="animate-spin" /> : null}
               Test GitHub
+            </button>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: '#F59E0B' }}>
+              Rally Connection
+            </h3>
+            <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
+              Use a Rally API key from your profile (sent as <code className="text-[10px]">ZSESSIONID</code>). Workspace and project names must match Rally exactly.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Workspace</label>
+                <input type="text" value={rallyWorkspace} onChange={e => setRallyWorkspace(e.target.value)} placeholder="My Workspace" className="input text-sm w-full" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Project / Team</label>
+                <input type="text" value={rallyProject} onChange={e => setRallyProject(e.target.value)} placeholder="My Team" className="input text-sm w-full" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                  Iteration name (optional)
+                  <span className="block font-normal mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Sprint filter — leave blank to list all stories in the project</span>
+                </label>
+                <input type="text" value={rallyIteration} onChange={e => setRallyIteration(e.target.value)} placeholder="Sprint 12" className="input text-sm w-full" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>
+                  API key
+                  {rallyApiKeySet && !rallyApiKey && <span className="ml-2 text-xs font-normal" style={{ color: '#22C55E' }}>● saved</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showRallyApiKey ? 'text' : 'password'}
+                    value={rallyApiKey}
+                    onChange={e => setRallyApiKey(e.target.value)}
+                    placeholder={rallyApiKeySet ? 'Leave blank to keep current' : 'Rally API key'}
+                    className="input text-sm w-full pr-9 font-mono"
+                  />
+                  <button type="button" onClick={() => setShowRallyApiKey(p => !p)} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-muted)' }}>
+                    {showRallyApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+            {rallyTestResult && (
+              <div className="flex items-start gap-2 mt-3 rounded-lg px-3 py-2 text-sm" style={{ background: rallyTestResult.ok ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${rallyTestResult.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`, color: rallyTestResult.ok ? '#22C55E' : '#FCA5A5' }}>
+                {rallyTestResult.ok ? <CheckCircle size={14} className="mt-0.5 shrink-0" /> : <XCircle size={14} className="mt-0.5 shrink-0" />}
+                {rallyTestResult.ok ? 'Rally OK' : rallyTestResult.error ?? 'Failed'}
+              </div>
+            )}
+            <button
+              onClick={handleTestRally}
+              disabled={
+                testingRally ||
+                !rallyWorkspace.trim() ||
+                !rallyProject.trim() ||
+                (!rallyApiKey.trim() && !rallyApiKeySet)
+              }
+              className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium"
+              style={{
+                background: 'var(--color-surface-2)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-secondary)',
+                opacity:
+                  testingRally ||
+                  !rallyWorkspace.trim() ||
+                  !rallyProject.trim() ||
+                  (!rallyApiKey.trim() && !rallyApiKeySet)
+                    ? 0.5
+                    : 1,
+              }}
+            >
+              {testingRally ? <Loader2 size={13} className="animate-spin" /> : null}
+              Test Rally
             </button>
           </div>
         </div>

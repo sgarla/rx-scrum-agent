@@ -15,6 +15,8 @@ from ..services.assets_parser import extract_assets
 from ..services import stream_manager
 from ..stories import get_story, update_story_status
 from ..services.github import get_issue_by_key, parse_github_story_key
+from ..services.rally import get_story_by_key as get_rally_story_by_key
+from ..services.rally import parse_rally_story_key, rally_story_to_agent_dict
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,8 +44,17 @@ async def create_conversation(body: CreateConversationRequest, db: Session = Dep
     pk = str(body.story_key)
     is_incident = bool(re.match(r'^INC\d+$', pk, re.IGNORECASE))
     is_gh = parse_github_story_key(pk) is not None
+    is_rally = parse_rally_story_key(pk) is not None
 
-    if is_gh:
+    if is_rally:
+        rally = get_rally_story_by_key(db, pk)
+        if not rally:
+            raise HTTPException(
+                status_code=404,
+                detail="Rally story not found. Configure Rally in Settings or verify the Formatted ID.",
+            )
+        story = rally_story_to_agent_dict(rally)
+    elif is_gh:
         issue = get_issue_by_key(db, pk)
         if not issue:
             raise HTTPException(

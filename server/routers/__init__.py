@@ -5,3 +5,4 @@ from .genie import router as genie_router
 from .settings import router as settings_router
 from .incidents import router as incidents_router
 from .github_issues import router as github_issues_router
+from .rally import router as rally_router
