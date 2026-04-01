@@ -161,6 +161,29 @@ After completing all work, provide a 1–3 sentence summary of what was accompli
 Do NOT output XML tags or structured formats — plain natural language only.
 """
 
+_PLAN_WRITE_INSTRUCTIONS = """
+## Saving the Plan (REQUIRED when user approves)
+
+When the user indicates they are ready to execute (e.g. "approve", "looks good", "let's do it", "proceed"),
+you MUST write the finalized plan to `plan.md` in your working directory using the Write tool BEFORE
+telling them to switch to Agent Mode.
+
+The file should contain:
+- A concise summary of the approach
+- Ordered implementation steps with specific tool names, catalog/schema targets, and config values
+- Any assumptions or decisions made during planning
+
+After writing the file, confirm it is saved and tell the user to switch to **Agent Mode**.
+"""
+
+_PLAN_READ_INSTRUCTIONS = """
+## Picking Up a Prior Plan
+
+Before starting any work, check if a `plan.md` file exists in your working directory using the Read tool.
+If it exists, read it and use it as your primary implementation guide — follow its steps in order.
+If it does not exist, proceed based on the story/issue details below.
+"""
+
 
 def build_story_system_prompt(story: dict) -> str:
     """Build a complete system prompt for building a specific JIRA story."""
@@ -186,7 +209,7 @@ def build_story_system_prompt(story: dict) -> str:
 You are an expert **Databricks data engineer and AI practitioner** acting as a virtual scrum team member.
 Your task is to implement the following JIRA user story end-to-end on Databricks.{workspace_line}
 {_WORK_PREAMBLE}
-
+{_PLAN_READ_INSTRUCTIONS}
 You have access to all Databricks MCP tools (pipelines, SQL, jobs, serving endpoints, Unity Catalog, etc.)
 and the Claude Code built-in tools (Read, Write, Edit, Glob, Grep) for writing code files.
 
@@ -245,6 +268,7 @@ You are in **Plan Mode** — your role is to help the user think through, design
 You will NOT execute any code, create notebooks, run jobs, or use Databricks tools.
 Instead, provide thoughtful analysis, architecture recommendations, step-by-step plans, and answer questions conversationally.
 {_WORK_PREAMBLE}
+{_PLAN_WRITE_INSTRUCTIONS}
 
 ## Story: {key} — {summary}
 
@@ -286,7 +310,7 @@ def build_incident_system_prompt() -> str:
 
 You are an expert **Databricks Site Reliability Engineer and data platform specialist**.
 Your role is to investigate ServiceNow incidents affecting Databricks resources.{workspace_line}
-
+{_PLAN_READ_INSTRUCTIONS}
 You have access to all Databricks MCP tools and Claude Code built-in tools.
 
 ## Investigation Approach
@@ -331,7 +355,7 @@ def build_github_issue_system_prompt(story: dict) -> str:
 You are an expert **Databricks data engineer** helping implement work tracked as a **GitHub issue**
 (often alongside the **ai-dev-kit** or internal platform repos).{workspace_line}
 {_WORK_PREAMBLE}
-
+{_PLAN_READ_INSTRUCTIONS}
 You have access to all Databricks MCP tools and Claude Code built-in tools (Read, Write, Edit, Glob, Grep).
 
 ## GitHub Issue #{num}
@@ -374,7 +398,7 @@ def build_github_planning_system_prompt(story: dict) -> str:
 
 You are in **Plan Mode** — discuss design and steps only; do not execute Databricks tools or write production code.
 {_WORK_PREAMBLE}
-
+{_PLAN_WRITE_INSTRUCTIONS}
 ## GitHub Issue: {key}
 
 **Title:** {title}
@@ -412,7 +436,7 @@ def build_rally_story_system_prompt(story: dict) -> str:
 You are an expert **Databricks data engineer** implementing work tracked as a **Rally user story**
 (Broadcom Rally / Agile Central).{workspace_line}
 {_WORK_PREAMBLE}
-
+{_PLAN_READ_INSTRUCTIONS}
 You have access to all Databricks MCP tools and Claude Code built-in tools (Read, Write, Edit, Glob, Grep).
 
 ## Rally Story
@@ -455,7 +479,7 @@ def build_rally_planning_system_prompt(story: dict) -> str:
 
 You are in **Plan Mode** — discuss design and steps only; do not execute Databricks tools or write production code.
 {_WORK_PREAMBLE}
-
+{_PLAN_WRITE_INSTRUCTIONS}
 ## Rally story: {key} ({fid})
 
 **Title:** {title}

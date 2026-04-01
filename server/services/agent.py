@@ -298,6 +298,7 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
     except ImportError:
         pass
 
+    # Select system prompt based on mode and story type
     if mode == 'plan':
         if is_github:
             system_prompt = build_github_planning_system_prompt(story)
@@ -305,28 +306,20 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
             system_prompt = build_rally_planning_system_prompt(story)
         else:
             system_prompt = build_planning_system_prompt(story)
-        allowed_tools = BUILTIN_TOOLS
-        mcp_servers = {}
     elif is_incident:
         system_prompt = build_incident_system_prompt()
-        mcp_server, tool_names = _load_databricks_tools()
-        allowed_tools = BUILTIN_TOOLS + tool_names
-        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
     elif is_github:
         system_prompt = build_github_issue_system_prompt(story)
-        mcp_server, tool_names = _load_databricks_tools()
-        allowed_tools = BUILTIN_TOOLS + tool_names
-        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
     elif is_rally:
         system_prompt = build_rally_story_system_prompt(story)
-        mcp_server, tool_names = _load_databricks_tools()
-        allowed_tools = BUILTIN_TOOLS + tool_names
-        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
     else:
         system_prompt = build_story_system_prompt(story)
-        mcp_server, tool_names = _load_databricks_tools()
-        allowed_tools = BUILTIN_TOOLS + tool_names
-        mcp_servers = {"databricks": mcp_server} if mcp_server else {}
+
+    # Always load Databricks tools — same config across plan and agent modes
+    # so sessions can be resumed seamlessly when switching modes.
+    mcp_server, tool_names = _load_databricks_tools()
+    allowed_tools = BUILTIN_TOOLS + tool_names
+    mcp_servers = {"databricks": mcp_server} if mcp_server else {}
 
     work_dir = get_agent_work_dir(conversation_id)
     _copy_skills_to_work_dir(work_dir)

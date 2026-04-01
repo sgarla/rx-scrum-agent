@@ -347,10 +347,9 @@ async def invoke_agent(body: InvokeAgentRequest, db: Session = Depends(get_db)):
             _db.close()
 
     # Start agent background thread
-    # Don't resume sessions across mode switches — plan and agent modes have
-    # different tool configurations (MCP servers), and resuming a plan session
-    # in agent mode crashes the CLI subprocess.
-    resume_session_id = conv.session_id if body.mode == 'plan' else None
+    # Always resume — plan and agent modes share identical tool configs,
+    # so sessions carry full context across mode switches seamlessly.
+    resume_session_id = conv.session_id
     thread = start_agent_build(
         story=story,
         messages=messages,
