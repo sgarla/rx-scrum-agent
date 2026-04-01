@@ -17,6 +17,33 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
+# #region agent log
+_DEBUG_LOG_PATH = Path(__file__).resolve().parent.parent.parent / ".cursor" / "debug-862f93.log"
+
+
+def _debug_ndjson(hypothesis_id: str, location: str, message: str, data: dict | None = None) -> None:
+    import json
+    import time
+
+    try:
+        payload = {
+            "sessionId": "862f93",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data or {},
+            "timestamp": int(time.time() * 1000),
+            "runId": os.environ.get("DEBUG_RUN_ID", "run1"),
+        }
+        _DEBUG_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with _DEBUG_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, default=str) + "\n")
+    except Exception:
+        pass
+
+
+# #endregion
+
 # Built-in Claude Code tools available to the agent
 BUILTIN_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep"]
 
@@ -27,9 +54,10 @@ WORK_DIR = os.getenv("WORK_DIR", "./agent_work")
 DATABRICKS_HOST = os.getenv("DATABRICKS_HOST", "")
 DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN", "")
 
-# Skills directory — defaults to skills/ bundled in this project
-_PROJECT_ROOT = Path(__file__).parent.parent
-SKILLS_DIR = os.getenv("SKILLS_DIR", str(_PROJECT_ROOT / "skills"))
+# Skills directory — defaults to repo-root skills/ (not server/skills)
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _SERVER_DIR.parent
+SKILLS_DIR = os.getenv("SKILLS_DIR", str(_REPO_ROOT / "skills"))
 
 # LLM config
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ANTHROPIC")
@@ -72,8 +100,21 @@ def _load_databricks_tools():
         sdk_tools = []
         tool_names = []
 
-        for name, mcp_tool in mcp._tool_manager._tools.items():
-            input_schema = _convert_mcp_schema(mcp_tool.parameters)
+        # Enumerate tools — handle different fastmcp versions:
+        #   New: _tool_manager.list_tools() returns Tool objects with .fn
+        #   Old: _tool_manager._tools was a dict (name → Tool)
+        # Both give internal Tool objects with .fn so we can call directly.
+        tool_manager = getattr(mcp, '_tool_manager', None)
+        if tool_manager is None:
+            raise ImportError("FastMCP object has no _tool_manager — unsupported fastmcp version")
+        if hasattr(tool_manager, '_tools'):
+            raw_tools = list(tool_manager._tools.values())
+        else:
+            raw_tools = tool_manager.list_tools()
+
+        for mcp_tool in raw_tools:
+            name = mcp_tool.name
+            input_schema = _convert_mcp_schema(getattr(mcp_tool, 'parameters', None))
             wrapped = _make_sdk_wrapper(name, mcp_tool.description, input_schema, mcp_tool.fn)
             sdk_tools.append(wrapped)
             tool_names.append(f"mcp__databricks__{name}")
@@ -292,6 +333,23 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
         f"Agent auth: LLM_PROVIDER={LLM_PROVIDER}, host_set={bool(host)}, token_set={bool(token)}, "
         f"mode={mode}, is_incident={is_incident}, is_github={is_github}, is_rally={is_rally}"
     )
+    # #region agent log
+    _repo_root = Path(__file__).resolve().parent.parent.parent
+    _skills_default = _repo_root / "skills"
+    _debug_ndjson(
+        "H-SKILLS",
+        "agent.py:_run_async:paths",
+        "skills and cwd resolution",
+        {
+            "SKILLS_DIR": SKILLS_DIR,
+            "skills_dir_exists": Path(SKILLS_DIR).exists(),
+            "repo_root_skills_exists": _skills_default.exists(),
+            "server_dir": str(_SERVER_DIR),
+            "repo_root": str(_repo_root),
+            "cwd": os.getcwd(),
+        },
+    )
+    # #endregion
     try:
         from databricks_tools_core.auth import set_databricks_auth
         set_databricks_auth(host, token)
@@ -320,15 +378,53 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
     mcp_server, tool_names = _load_databricks_tools()
     allowed_tools = BUILTIN_TOOLS + tool_names
     mcp_servers = {"databricks": mcp_server} if mcp_server else {}
+    # #region agent log
+    _debug_ndjson(
+        "H-MCP",
+        "agent.py:_run_async:mcp",
+        "mcp and tools",
+        {
+            "mcp_attached": mcp_server is not None,
+            "databricks_tool_count": len(tool_names),
+            "allowed_tools_count": len(allowed_tools),
+        },
+    )
+    # #endregion
 
     work_dir = get_agent_work_dir(conversation_id)
     _copy_skills_to_work_dir(work_dir)
     claude_env = build_claude_env(host, token)
+    # #region agent log
+    _debug_ndjson(
+        "H-AUTH-FMAPI",
+        "agent.py:_run_async:env",
+        "llm env keys present (no secrets)",
+        {
+            "LLM_PROVIDER": LLM_PROVIDER,
+            "DATABRICKS_MODEL": DATABRICKS_MODEL,
+            "anthropic_base_url_set": bool(claude_env.get("ANTHROPIC_BASE_URL")),
+            "anthropic_model_set": bool(claude_env.get("ANTHROPIC_MODEL")),
+            "api_key_env_set": bool(claude_env.get("ANTHROPIC_API_KEY")),
+        },
+    )
+    # #endregion
 
     def stderr_cb(line: str):
         logger.info(f"[claude stderr] {line.strip()}")
+        # #region agent log
+        s = (line or "").strip()
+        if s:
+            _debug_ndjson(
+                "H-CLI-STDERR",
+                "agent.py:stderr_cb",
+                "claude subprocess stderr line",
+                {"line": s[:4000]},
+            )
+        # #endregion
 
-    options = ClaudeAgentOptions(
+    # include_partial_messages uses the context_management API field which
+    # Databricks FMAPI does not support — only enable for direct Anthropic.
+    opts: dict = dict(
         cwd=str(work_dir),
         allowed_tools=allowed_tools,
         permission_mode="bypassPermissions",
@@ -337,9 +433,19 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
         system_prompt=system_prompt,
         setting_sources=["user", "project"],
         env=claude_env,
-        include_partial_messages=True,
         stderr=stderr_cb,
     )
+    if LLM_PROVIDER != "DATABRICKS":
+        opts["include_partial_messages"] = True
+    options = ClaudeAgentOptions(**opts)
+    # #region agent log
+    _debug_ndjson(
+        "H-PATH",
+        "agent.py:_run_async:options",
+        "subprocess cwd and work_dir",
+        {"cwd_option": str(work_dir), "work_dir_exists": work_dir.exists()},
+    )
+    # #endregion
 
     last_message = messages[-1]["content"] if messages else "Please proceed."
 
@@ -349,4 +455,12 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
     except asyncio.CancelledError:
         logger.info("Agent query cancelled")
     except Exception as e:
+        # #region agent log
+        _debug_ndjson(
+            "H-EXCEPT",
+            "agent.py:_run_async:query",
+            "query failed",
+            {"error_type": type(e).__name__, "error_str": str(e)[:2000]},
+        )
+        # #endregion
         logger.exception(f"Agent query error: {e}")
