@@ -2,7 +2,7 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 sqlalchemy==2.0.36
 psycopg2-binary>=2.9.9
-claude-agent-sdk==0.1.19
+claude-agent-sdk==0.1.44
 databricks-tools-core @ git+https://github.com/databricks-solutions/ai-dev-kit.git#subdirectory=databricks-tools-core
 databricks-mcp-server @ git+https://github.com/databricks-solutions/ai-dev-kit.git#subdirectory=databricks-mcp-server
 anthropic>=0.42.0

@@ -422,8 +422,8 @@ async def _run_async(story, messages, session_id, conversation_id, put_event, mo
             )
         # #endregion
 
-    # include_partial_messages uses the context_management API field which
-    # Databricks FMAPI does not support — only enable for direct Anthropic.
+    # include_partial_messages triggers context_management in the Claude CLI,
+    # which some workspace FMAPI versions don't support — only enable for direct Anthropic.
     opts: dict = dict(
         cwd=str(work_dir),
         allowed_tools=allowed_tools,
